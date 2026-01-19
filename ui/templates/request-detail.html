@@ -28,35 +28,35 @@
     </div>
 
     <!-- Scrollable Content -->
-    <div class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-8">
+    <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
         <!-- Headers -->
         <div>
-            <div class="flex items-center justify-between mb-3">
-                <button onclick="toggleSection('headers-section')" class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 hover:text-slate-400 transition-colors">
-                    <i class="fas fa-list-ul text-[10px]"></i>
+            <div class="flex items-center justify-between mb-1.5">
+                <button onclick="toggleSection('headers-section')" class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 hover:text-slate-400 transition-colors">
+                    <i class="fas fa-list-ul text-[9px]"></i>
                     Headers
-                    <i id="headers-chevron" class="fas fa-chevron-down text-[8px] transition-transform"></i>
+                    <i id="headers-chevron" class="fas fa-chevron-down text-[7px] transition-transform"></i>
                 </button>
                 <div class="flex items-center gap-2">
                     <button onclick="toggleHeadersView()" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800" title="Toggle view" id="headers-view-toggle">
-                        <i class="fas fa-code text-xs"></i>
+                        <i class="fas fa-code text-[10px]"></i>
                     </button>
                     <button onclick="copyHeaders()" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800" title="Copy headers">
-                        <i class="far fa-copy text-xs"></i>
+                        <i class="far fa-copy text-[10px]"></i>
                     </button>
                 </div>
             </div>
-            <div id="headers-section" class="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden shadow-inner">
+            <div id="headers-section" class="bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden shadow-inner">
                 <!-- JSON View (default) -->
-                <div id="headers-json-view" class="p-4">
-                    <pre class="text-xs font-mono text-slate-200 whitespace-pre overflow-x-auto m-0">{{ .HeadersJSON }}</pre>
+                <div id="headers-json-view" class="p-3">
+                    <pre class="text-[11px] font-mono text-slate-300 whitespace-pre overflow-x-auto m-0 leading-tight">{{ .HeadersJSON }}</pre>
                 </div>
                 <!-- List View (hidden by default) -->
-                <div id="headers-list-view" class="divide-y divide-slate-800/30 hidden">
+                <div id="headers-list-view" class="divide-y divide-slate-800/20 hidden">
                     {{ range $key, $values := .HeadersMap }}
-                    <div class="px-4 py-3 hover:bg-slate-800/40 transition-colors">
-                        <div class="text-[10px] text-slate-500 font-mono font-semibold mb-1 uppercase tracking-wider">{{ $key }}</div>
-                        <div class="text-xs text-brand-300 font-mono break-all">{{ index $values 0 }}</div>
+                    <div class="px-3 py-2 hover:bg-slate-800/40 transition-colors">
+                        <div class="text-[9px] text-slate-500 font-mono font-semibold mb-0.5 uppercase tracking-wider">{{ $key }}</div>
+                        <div class="text-[11px] text-brand-300 font-mono break-all leading-tight">{{ index $values 0 }}</div>
                     </div>
                     {{ end }}
                 </div>
@@ -65,55 +65,44 @@
 
         <!-- Body -->
         <div>
-            <div class="flex items-center justify-between mb-3">
-                <button onclick="toggleSection('body-section')" class="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 hover:text-slate-400 transition-colors">
-                    <i class="fas fa-code text-[10px]"></i>
+            <div class="flex items-center justify-between mb-1.5">
+                <button onclick="toggleSection('body-section')" class="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2 hover:text-slate-400 transition-colors">
+                    <i class="fas fa-code text-[9px]"></i>
                     Payload Body
-                    <i id="body-chevron" class="fas fa-chevron-down text-[8px] transition-transform"></i>
+                    <i id="body-chevron" class="fas fa-chevron-down text-[7px] transition-transform"></i>
                 </button>
-                <div class="flex items-center gap-3">
-                    <span class="text-[10px] text-slate-600 bg-slate-900/50 border border-slate-800 px-2 py-0.5 rounded font-mono">{{ len .Body }} bytes</span>
+                <div class="flex items-center gap-2">
+                    <span class="text-[9px] text-slate-600 bg-slate-900/50 border border-slate-800 px-1.5 py-0.5 rounded font-mono">{{ len .Body }} bytes</span>
                     {{ if .ContentType }}
-                    <span class="text-[10px] text-slate-500 bg-slate-900/50 border border-slate-800 px-2 py-0.5 rounded font-mono">{{ .ContentType }}</span>
+                    <span class="text-[9px] text-slate-500 bg-slate-900/50 border border-slate-800 px-1.5 py-0.5 rounded font-mono">{{ .ContentType }}</span>
                     {{ end }}
                     {{ if not .IsBinary }}
                     <button onclick="formatBody()" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800" title="Format/Prettify">
-                        <i class="fas fa-indent text-xs"></i>
+                        <i class="fas fa-indent text-[10px]"></i>
                     </button>
                     {{ end }}
                     <button onclick="copyBody()" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800" title="Copy body">
-                        <i class="far fa-copy text-xs"></i>
+                        <i class="far fa-copy text-[10px]"></i>
                     </button>
                 </div>
             </div>
-            <div id="body-section" class="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
-                <!-- Editor Header Bar -->
-                <div class="bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <div class="flex gap-1.5">
-                            <div class="w-2.5 h-2.5 rounded-full bg-red-500/60"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-yellow-500/60"></div>
-                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-500/60"></div>
-                        </div>
-                        <span class="text-[10px] text-slate-500 font-mono ml-2">body</span>
-                    </div>
-                </div>
+            <div id="body-section" class="bg-slate-950 border border-slate-800 rounded-lg overflow-hidden shadow-xl">
                 <!-- Code Editor Content -->
-                <div class="relative overflow-auto max-h-[500px] custom-scrollbar">
+                <div class="relative overflow-auto max-h-[600px] custom-scrollbar">
                     <div class="flex">
                         <!-- Line Numbers -->
-                        <div id="line-numbers" class="bg-slate-900/80 text-slate-600 text-[11px] font-mono py-3 px-3 text-right select-none border-r border-slate-800/50 sticky left-0"></div>
+                        <div id="line-numbers" class="bg-slate-900/80 text-slate-600 text-[10px] font-mono py-2 px-2 text-right select-none border-r border-slate-800/30 sticky left-0"></div>
                         <!-- Code Content -->
                         {{ if .IsBinary }}
-                        <div class="flex-1 py-3 px-4 flex items-center justify-center">
+                        <div class="flex-1 py-4 px-4 flex items-center justify-center">
                             <div class="text-center">
-                                <i class="fas fa-file-binary text-4xl text-slate-700 mb-2"></i>
-                                <p class="text-xs text-slate-500 font-mono">Binary content ({{ len .Body }} bytes)</p>
-                                <p class="text-[10px] text-slate-600 mt-1">Cannot display binary data</p>
+                                <i class="fas fa-file-binary text-3xl text-slate-700 mb-2"></i>
+                                <p class="text-[10px] text-slate-500 font-mono">Binary content ({{ len .Body }} bytes)</p>
+                                <p class="text-[9px] text-slate-600 mt-1">Cannot display binary data</p>
                             </div>
                         </div>
                         {{ else }}
-                        <pre id="body-raw" class="flex-1 text-[11px] font-mono py-3 px-4 m-0 leading-relaxed whitespace-pre overflow-x-auto">{{ if .BodyString }}{{ .BodyString }}{{ else }}<span class="text-slate-600 italic">Empty body</span>{{ end }}</pre>
+                        <pre id="body-raw" class="flex-1 text-[11px] font-mono py-2 px-3 m-0 leading-normal whitespace-pre overflow-x-auto">{{ if .BodyString }}{{ .BodyString | html }}{{ else }}<span class="text-slate-600 italic">Empty body</span>{{ end }}</pre>
                         {{ end }}
                     </div>
                 </div>
