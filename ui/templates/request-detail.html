@@ -65,9 +65,14 @@
                 </button>
                 <div class="flex items-center gap-3">
                     <span class="text-[10px] text-slate-600 bg-slate-900/50 border border-slate-800 px-2 py-0.5 rounded font-mono">{{ len .Body }} bytes</span>
-                    <button onclick="formatBody()" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800" title="Format JSON">
+                    {{ if .ContentType }}
+                    <span class="text-[10px] text-slate-500 bg-slate-900/50 border border-slate-800 px-2 py-0.5 rounded font-mono">{{ .ContentType }}</span>
+                    {{ end }}
+                    {{ if not .IsBinary }}
+                    <button onclick="formatBody()" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800" title="Format/Prettify">
                         <i class="fas fa-indent text-xs"></i>
                     </button>
+                    {{ end }}
                     <button onclick="navigator.clipboard.writeText(document.getElementById('body-raw').innerText)" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800">
                         <i class="far fa-copy text-xs"></i>
                     </button>
@@ -91,7 +96,17 @@
                         <!-- Line Numbers -->
                         <div id="line-numbers" class="bg-slate-900/80 text-slate-600 text-[11px] font-mono py-3 px-3 text-right select-none border-r border-slate-800/50 sticky left-0"></div>
                         <!-- Code Content -->
+                        {{ if .IsBinary }}
+                        <div class="flex-1 py-3 px-4 flex items-center justify-center">
+                            <div class="text-center">
+                                <i class="fas fa-file-binary text-4xl text-slate-700 mb-2"></i>
+                                <p class="text-xs text-slate-500 font-mono">Binary content ({{ len .Body }} bytes)</p>
+                                <p class="text-[10px] text-slate-600 mt-1">Cannot display binary data</p>
+                            </div>
+                        </div>
+                        {{ else }}
                         <pre id="body-raw" class="flex-1 text-[11px] font-mono py-3 px-4 m-0 leading-relaxed whitespace-pre overflow-x-auto">{{ if .BodyString }}{{ .BodyString }}{{ else }}<span class="text-slate-600 italic">Empty body</span>{{ end }}</pre>
+                        {{ end }}
                     </div>
                 </div>
             </div>
@@ -118,7 +133,10 @@
 
             const bodyRaw = document.getElementById('body-raw');
             const lineNumbers = document.getElementById('line-numbers');
+            const contentType = '{{ .ContentType }}';
             let isJSON = false;
+            let isXML = false;
+            let isHTML = false;
 
             function escapeHtml(text) {
                 const div = document.createElement('div');
@@ -155,50 +173,128 @@
             }
 
             function updateLineNumbers() {
+                if (!bodyRaw || !lineNumbers) return;
                 const text = bodyRaw.innerText || bodyRaw.textContent || '';
                 const lines = text.split('\n');
                 lineNumbers.innerHTML = lines.map((_, i) => `<div class="leading-relaxed">${i + 1}</div>`).join('');
             }
 
-            function formatAndHighlight() {
-                const originalText = bodyRaw.textContent || bodyRaw.innerText || '';
-                if (!originalText.trim()) return;
-
-                try {
-                    const json = JSON.parse(originalText);
-                    const formatted = JSON.stringify(json, null, 2);
-                    bodyRaw.innerHTML = highlightJSON(formatted);
-                    isJSON = true;
-                    updateLineNumbers();
-                } catch (e) {
-                    // Not JSON, keep as is
-                    bodyRaw.textContent = originalText;
-                    isJSON = false;
-                    updateLineNumbers();
+            function detectContentType(text, headerType) {
+                // Check header first
+                if (headerType) {
+                    const lower = headerType.toLowerCase();
+                    if (lower.includes('json')) return 'json';
+                    if (lower.includes('xml')) return 'xml';
+                    if (lower.includes('html')) return 'html';
                 }
+
+                // Try to detect from content
+                const trimmed = text.trim();
+                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                    try {
+                        JSON.parse(trimmed);
+                        return 'json';
+                    } catch (e) {}
+                }
+                if (trimmed.startsWith('<?xml') || trimmed.startsWith('<') && trimmed.includes('>')) {
+                    if (trimmed.includes('<!DOCTYPE html') || trimmed.includes('<html')) {
+                        return 'html';
+                    }
+                    return 'xml';
+                }
+                return 'text';
+            }
+
+            function formatXML(xml) {
+                let formatted = '';
+                let indent = 0;
+                const tab = '  ';
+                xml.split(/>\s*</).forEach(function(node) {
+                    if (node.match(/^\/\w/)) indent--;
+                    formatted += tab.repeat(indent) + '<' + node + '>\r\n';
+                    if (node.match(/^<?\w[^>]*[^\/]$/) && !node.startsWith('<?xml')) indent++;
+                });
+                return formatted.substring(1, formatted.length - 2);
+            }
+
+            function formatAndHighlight() {
+                if (!bodyRaw) return;
+                const originalText = bodyRaw.textContent || bodyRaw.innerText || '';
+                if (!originalText.trim()) {
+                    updateLineNumbers();
+                    return;
+                }
+
+                const detectedType = detectContentType(originalText, contentType);
+
+                if (detectedType === 'json') {
+                    try {
+                        const json = JSON.parse(originalText);
+                        const formatted = JSON.stringify(json, null, 2);
+                        bodyRaw.innerHTML = highlightJSON(formatted);
+                        isJSON = true;
+                        updateLineNumbers();
+                        return;
+                    } catch (e) {}
+                }
+
+                // Not JSON or failed to parse, display as-is
+                bodyRaw.textContent = originalText;
+                isJSON = false;
+                isXML = false;
+                isHTML = false;
+                updateLineNumbers();
             }
 
             function formatBody() {
+                if (!bodyRaw) return;
                 const text = bodyRaw.textContent || bodyRaw.innerText || '';
-                try {
-                    const json = JSON.parse(text);
-                    const formatted = JSON.stringify(json, null, 2);
-                    bodyRaw.innerHTML = highlightJSON(formatted);
-                    isJSON = true;
-                    updateLineNumbers();
-                } catch (e) {
+                if (!text.trim()) return;
+
+                const detectedType = detectContentType(text, contentType);
+
+                if (detectedType === 'json') {
+                    try {
+                        const json = JSON.parse(text);
+                        const formatted = JSON.stringify(json, null, 2);
+                        bodyRaw.innerHTML = highlightJSON(formatted);
+                        isJSON = true;
+                        updateLineNumbers();
+                        if (typeof showToast === 'function') {
+                            showToast('JSON formatted', 'success');
+                        }
+                    } catch (e) {
+                        if (typeof showToast === 'function') {
+                            showToast('Not valid JSON', 'error');
+                        }
+                    }
+                } else if (detectedType === 'xml') {
+                    try {
+                        const formatted = formatXML(text);
+                        bodyRaw.textContent = formatted;
+                        isXML = true;
+                        updateLineNumbers();
+                        if (typeof showToast === 'function') {
+                            showToast('XML formatted', 'success');
+                        }
+                    } catch (e) {
+                        if (typeof showToast === 'function') {
+                            showToast('Failed to format XML', 'error');
+                        }
+                    }
+                } else {
                     if (typeof showToast === 'function') {
-                        showToast('Not valid JSON', 'error');
-                    } else {
-                        alert('Not valid JSON');
+                        showToast('No formatting available for this content type', 'info');
                     }
                 }
             }
 
             window.formatBody = formatBody;
 
-            // Auto-format on load
-            formatAndHighlight();
+            // Auto-format on load (only if bodyRaw exists, i.e., not binary)
+            if (bodyRaw) {
+                formatAndHighlight();
+            }
         })();
     </script>
     </div>

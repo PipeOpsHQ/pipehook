@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/PipeOpsHQ/pipehook/internal/store"
@@ -69,18 +70,44 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	type requestDetailData struct {
 		*store.Request
-		HeadersMap map[string][]string
-		BodyString string
+		HeadersMap  map[string][]string
+		BodyString  string
+		ContentType string
+		IsBinary    bool
 	}
 
 	var firstRequest *requestDetailData
 	if len(requests) > 0 {
 		var headers map[string][]string
 		json.Unmarshal([]byte(requests[0].Headers), &headers)
+
+		// Detect content type
+		contentType := "text/plain"
+		if ct, ok := headers["Content-Type"]; ok && len(ct) > 0 {
+			contentType = ct[0]
+			if idx := strings.Index(contentType, ";"); idx != -1 {
+				contentType = contentType[:idx]
+			}
+			contentType = strings.TrimSpace(contentType)
+		}
+
+		// Check if binary
+		isBinary := false
+		if len(requests[0].Body) > 0 {
+			for _, b := range requests[0].Body {
+				if b < 32 && b != 9 && b != 10 && b != 13 {
+					isBinary = true
+					break
+				}
+			}
+		}
+
 		firstRequest = &requestDetailData{
-			Request:    requests[0],
-			HeadersMap: headers,
-			BodyString: string(requests[0].Body),
+			Request:     requests[0],
+			HeadersMap:  headers,
+			BodyString:  string(requests[0].Body),
+			ContentType: contentType,
+			IsBinary:    isBinary,
 		}
 	}
 
@@ -117,14 +144,40 @@ func (h *Handler) RequestDetail(w http.ResponseWriter, r *http.Request) {
 	var headers map[string][]string
 	json.Unmarshal([]byte(req.Headers), &headers)
 
+	// Detect content type from headers
+	contentType := "text/plain"
+	if ct, ok := headers["Content-Type"]; ok && len(ct) > 0 {
+		contentType = ct[0]
+		// Extract just the MIME type (remove charset, etc.)
+		if idx := strings.Index(contentType, ";"); idx != -1 {
+			contentType = contentType[:idx]
+		}
+		contentType = strings.TrimSpace(contentType)
+	}
+
+	// Check if body is binary (non-printable characters)
+	isBinary := false
+	if len(req.Body) > 0 {
+		for _, b := range req.Body {
+			if b < 32 && b != 9 && b != 10 && b != 13 {
+				isBinary = true
+				break
+			}
+		}
+	}
+
 	data := struct {
 		*store.Request
-		HeadersMap map[string][]string
-		BodyString string
+		HeadersMap  map[string][]string
+		BodyString  string
+		ContentType string
+		IsBinary    bool
 	}{
-		Request:    req,
-		HeadersMap: headers,
-		BodyString: string(req.Body),
+		Request:     req,
+		HeadersMap:  headers,
+		BodyString:  string(req.Body),
+		ContentType: contentType,
+		IsBinary:    isBinary,
 	}
 
 	detailTemplate.ExecuteTemplate(w, "request-detail", data)
