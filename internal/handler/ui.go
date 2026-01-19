@@ -70,6 +70,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	type requestDetailData struct {
 		*store.Request
 		HeadersMap map[string][]string
+		BodyString string
 	}
 
 	var firstRequest *requestDetailData
@@ -79,6 +80,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		firstRequest = &requestDetailData{
 			Request:    requests[0],
 			HeadersMap: headers,
+			BodyString: string(requests[0].Body),
 		}
 	}
 
@@ -118,9 +120,11 @@ func (h *Handler) RequestDetail(w http.ResponseWriter, r *http.Request) {
 	data := struct {
 		*store.Request
 		HeadersMap map[string][]string
+		BodyString string
 	}{
 		Request:    req,
 		HeadersMap: headers,
+		BodyString: string(req.Body),
 	}
 
 	detailTemplate.ExecuteTemplate(w, "request-detail", data)

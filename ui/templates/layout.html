@@ -95,13 +95,62 @@
     <script>
         window.addEventListener('DOMContentLoaded', updateHeaderRecents);
 
-        document.body.addEventListener('requestReplayed', function(evt) {
+        // Custom toast notification system
+        function showToast(message, type = 'info', duration = 3000) {
             const notifications = document.getElementById('notifications');
+            if (!notifications) return;
+
             const toast = document.createElement('div');
-            toast.className = 'bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg text-xs font-bold flex items-center gap-2 animate-bounce';
-            toast.innerHTML = '<i class="fas fa-check-circle"></i> Request replayed successfully';
+            toast.className = 'px-4 py-3 rounded-lg shadow-xl text-xs font-bold flex items-center gap-2 min-w-[280px] max-w-md transform transition-all duration-300 translate-x-full opacity-0';
+
+            // Set colors and icons based on type
+            const configs = {
+                success: {
+                    bg: 'bg-emerald-600',
+                    text: 'text-white',
+                    icon: 'fa-check-circle'
+                },
+                error: {
+                    bg: 'bg-red-600',
+                    text: 'text-white',
+                    icon: 'fa-exclamation-circle'
+                },
+                warning: {
+                    bg: 'bg-yellow-600',
+                    text: 'text-white',
+                    icon: 'fa-exclamation-triangle'
+                },
+                info: {
+                    bg: 'bg-brand-600',
+                    text: 'text-white',
+                    icon: 'fa-info-circle'
+                }
+            };
+
+            const config = configs[type] || configs.info;
+            toast.className += ` ${config.bg} ${config.text}`;
+            toast.innerHTML = `<i class="fas ${config.icon}"></i><span>${message}</span>`;
+
             notifications.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
+
+            // Trigger animation
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-x-full', 'opacity-0');
+            });
+
+            // Auto remove after duration
+            setTimeout(() => {
+                toast.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
+        // Make it globally available
+        window.showToast = showToast;
+
+        // Handle request replayed event
+        document.body.addEventListener('requestReplayed', function(evt) {
+            showToast('Request replayed successfully', 'success');
         });
     </script>
 </body>
