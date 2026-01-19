@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"log"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -31,8 +32,18 @@ func NewSQLiteStore(dsn string) (*SQLiteStore, error) {
 }
 
 func (s *SQLiteStore) init() error {
+	// Check if we are in read-only mode
+	var readOnly int
+	err := s.db.QueryRow("PRAGMA query_only;").Scan(&readOnly)
+	if err == nil && readOnly == 1 {
+		log.Printf("CRITICAL WARNING: Database is opened in READ-ONLY mode!")
+	}
+
 	// Enable WAL mode and other optimizations
-	_, _ = s.db.Exec("PRAGMA journal_mode=WAL;")
+	// Note: WAL might fail on some network filesystems (NFS), so we log but don't hard fail
+	if _, err := s.db.Exec("PRAGMA journal_mode=WAL;"); err != nil {
+		log.Printf("Warning: Failed to enable WAL mode: %v", err)
+	}
 	_, _ = s.db.Exec("PRAGMA synchronous=NORMAL;")
 	_, _ = s.db.Exec("PRAGMA foreign_keys=ON;")
 	_, _ = s.db.Exec("PRAGMA busy_timeout=5000;")
@@ -58,7 +69,10 @@ func (s *SQLiteStore) init() error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_requests_endpoint_id ON requests(endpoint_id);
 	`
-	_, err := s.db.Exec(query)
+	_, err = s.db.Exec(query)
+	if err != nil {
+		log.Printf("Database schema initialization failed: %v", err)
+	}
 	return err
 }
 

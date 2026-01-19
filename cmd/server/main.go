@@ -24,7 +24,6 @@ func main() {
 	// Ensure the directory exists and is writable
 	dbDir := "."
 	if strings.Contains(dbPath, "/") {
-		// Use filepath.Dir if we wanted to import it, but simple split is enough here
 		parts := strings.Split(dbPath, "/")
 		dbDir = strings.Join(parts[:len(parts)-1], "/")
 	}
@@ -34,12 +33,24 @@ func main() {
 		if err := os.MkdirAll(dbDir, 0777); err != nil {
 			log.Printf("Warning: failed to create database directory: %v", err)
 		}
+	} else {
+		// Attempt to make directory writable just in case
+		os.Chmod(dbDir, 0777)
+	}
+
+	// If database file exists, check its permissions
+	if _, err := os.Stat(dbPath); err == nil {
+		log.Printf("Database file exists, attempting to ensure it is writable...")
+		if err := os.Chmod(dbPath, 0666); err != nil {
+			log.Printf("Warning: could not chmod database file: %v", err)
+		}
 	}
 
 	// Test if directory is writable
 	testFile := dbDir + "/.write_test"
 	if err := os.WriteFile(testFile, []byte("test"), 0666); err != nil {
 		log.Printf("CRITICAL: Database directory %s is NOT writable: %v", dbDir, err)
+		log.Printf("Current User ID: %d, Group ID: %d", os.Getuid(), os.Getgid())
 	} else {
 		os.Remove(testFile)
 		log.Printf("Database directory %s is writable", dbDir)
