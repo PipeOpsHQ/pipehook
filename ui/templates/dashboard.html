@@ -1,0 +1,70 @@
+{{ define "content" }}
+<div class="h-full flex overflow-hidden">
+    <!-- Compact Request List -->
+    <div class="w-72 lg:w-80 border-r border-slate-800 bg-slate-900/30 flex flex-col shrink-0">
+        <div class="p-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">History</span>
+            <span id="request-count" class="text-[10px] font-mono text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">
+                {{ len .Requests }}
+            </span>
+        </div>
+        <ul id="request-list" class="flex-1 overflow-y-auto custom-scrollbar divide-y divide-slate-800/50"
+            hx-ext="sse" sse-connect="/sse/{{ .Endpoint.ID }}" sse-swap="new-request" hx-swap="afterbegin">
+            {{ range .Requests }}
+                {{ template "request-item" . }}
+            {{ end }}
+        </ul>
+    </div>
+
+    <!-- Details Area -->
+    <div class="flex-1 flex flex-col min-w-0 bg-slate-950">
+        <!-- Endpoint Header -->
+        <div class="p-3 border-b border-slate-800 flex items-center justify-between gap-4 bg-slate-900/20">
+            <div class="flex items-center gap-3 min-w-0">
+                <span class="text-[10px] text-slate-500 font-medium whitespace-nowrap">URL:</span>
+                <code class="bg-slate-900 border border-slate-800 text-brand-400 px-2 py-0.5 rounded text-[11px] font-mono truncate select-all">http://{{ .Host }}/h/{{ .Endpoint.ID }}</code>
+                <button onclick="navigator.clipboard.writeText('http://{{ .Host }}/h/{{ .Endpoint.ID }}')" class="text-slate-600 hover:text-slate-400 transition-colors">
+                    <i class="fas fa-copy text-[10px]"></i>
+                </button>
+            </div>
+            <div class="flex items-center gap-3 whitespace-nowrap">
+                <span class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Live
+                </span>
+            </div>
+        </div>
+
+        <!-- Request Detail Placeholder/Content -->
+        <div id="request-detail" class="flex-1 overflow-hidden flex flex-col">
+            <div class="flex-1 flex flex-col items-center justify-center text-slate-600 p-8 text-center">
+                <i class="fas fa-terminal text-2xl mb-3 opacity-20"></i>
+                <p class="text-xs">Waiting for activity on endpoint...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail.target.id === 'request-list') {
+            const count = document.getElementById('request-count');
+            if (count) count.innerText = parseInt(count.innerText) + 1;
+        }
+    });
+</script>
+{{ end }}
+
+{{ define "request-item" }}
+<li class="group hover:bg-slate-800/30 cursor-pointer transition-colors relative border-l-2 border-transparent active:bg-slate-800/50"
+    hx-get="/r/{{ .ID }}" hx-target="#request-detail"
+    onclick="document.querySelectorAll('#request-list li').forEach(el => el.classList.remove('bg-slate-800/40', 'border-brand-500')); this.classList.add('bg-slate-800/40', 'border-brand-500')">
+    <div class="px-3 py-2.5">
+        <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold {{ if eq .Method "GET" }}text-emerald-500{{ else }}text-brand-400{{ end }} font-mono">{{ .Method }}</span>
+            <span class="text-[9px] text-slate-500 font-mono">{{ .CreatedAt.Format "15:04:05" }}</span>
+        </div>
+        <p class="text-[11px] text-slate-300 font-mono truncate">{{ .Path }}</p>
+    </div>
+</li>
+{{ end }}

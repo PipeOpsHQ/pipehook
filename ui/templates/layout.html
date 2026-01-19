@@ -1,0 +1,50 @@
+{{ define "layout" }}
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PipeHooks</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/sse.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        pre, code { font-family: 'JetBrains Mono', monospace; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #334155; }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 500: '#3b82f6', 600: '#2563eb' },
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="h-full antialiased bg-slate-950 flex flex-col">
+    <header class="h-12 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between px-4 shrink-0">
+        <a href="/" class="flex items-center gap-2 text-brand-500 font-bold text-sm tracking-tight">
+            <i class="fas fa-bolt text-xs"></i>
+            <span>PipeHooks</span>
+        </a>
+        <div class="flex items-center gap-4 text-xs text-slate-500">
+            <a href="https://pipeops.io" target="_blank" class="hover:text-slate-300">PipeOps</a>
+            <span class="w-px h-3 bg-slate-800"></span>
+            <a href="https://github.com/nitrocode/webhook" target="_blank" class="hover:text-slate-300"><i class="fab fa-github"></i></a>
+        </div>
+    </header>
+    <main class="flex-1 overflow-hidden">
+        {{ template "content" . }}
+    </main>
+</body>
+</html>
+{{ end }}

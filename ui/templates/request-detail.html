@@ -1,0 +1,54 @@
+{{ define "request-detail" }}
+<div class="flex flex-col h-full overflow-hidden">
+    <!-- Compact Header -->
+    <div class="px-4 py-2 border-b border-slate-800 bg-slate-900/40 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+            <span class="text-[11px] font-bold text-brand-400 font-mono">{{ .Method }}</span>
+            <span class="text-[11px] text-slate-300 font-mono truncate">{{ .Path }}</span>
+        </div>
+        <button class="text-[10px] font-bold text-white bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded transition-colors flex items-center gap-1.5"
+                hx-post="/r/{{ .ID }}/replay" hx-swap="none">
+            <i class="fas fa-repeat text-[9px]"></i>
+            Replay
+        </button>
+    </div>
+
+    <!-- Scrollable Content -->
+    <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-6">
+        <!-- Headers -->
+        <div>
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Headers</h4>
+                <button onclick="navigator.clipboard.writeText(document.getElementById('headers-raw').innerText)" class="text-slate-600 hover:text-slate-400">
+                    <i class="far fa-copy text-[10px]"></i>
+                </button>
+            </div>
+            <div class="bg-slate-900/50 border border-slate-800 rounded overflow-hidden">
+                <table class="w-full text-left text-[11px] font-mono">
+                    <tbody id="headers-raw">
+                        {{ range $key, $values := .HeadersMap }}
+                        <tr class="border-b border-slate-800/30 last:border-0 hover:bg-slate-800/20">
+                            <td class="py-1.5 px-3 text-slate-500 w-1/3 border-r border-slate-800/30">{{ $key }}</td>
+                            <td class="py-1.5 px-3 text-brand-300 break-all">{{ index $values 0 }}</td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div>
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Body</h4>
+                <button onclick="navigator.clipboard.writeText(document.getElementById('body-raw').innerText)" class="text-slate-600 hover:text-slate-400">
+                    <i class="far fa-copy text-[10px]"></i>
+                </button>
+            </div>
+            <div class="bg-slate-900/50 border border-slate-800 rounded p-3">
+                <pre id="body-raw" class="text-[11px] text-slate-300 font-mono whitespace-pre-wrap break-all leading-relaxed">{{ if .Body }}{{ printf "%s" .Body }}{{ else }}<span class="text-slate-600 italic">No body</span>{{ end }}</pre>
+            </div>
+        </div>
+    </div>
+</div>
+{{ end }}
