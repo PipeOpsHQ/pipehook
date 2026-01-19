@@ -28,6 +28,7 @@ type Store interface {
 	CreateEndpoint(ctx context.Context, id string, alias string, ttl time.Duration) (*Endpoint, error)
 	GetEndpoint(ctx context.Context, id string) (*Endpoint, error)
 	DeleteEndpoint(ctx context.Context, id string) error
+	ListEndpoints(ctx context.Context, limit int) ([]*Endpoint, error)
 
 	SaveRequest(ctx context.Context, req *Request) error
 	GetRequests(ctx context.Context, endpointID string, limit int) ([]*Request, error)

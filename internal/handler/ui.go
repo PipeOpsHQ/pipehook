@@ -7,13 +7,27 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/PipeOpsHQ/pipehook/internal/store"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/PipeOpsHQ/pipehook/internal/store"
 )
 
 func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
-	if err := homeTemplate.ExecuteTemplate(w, "layout", nil); err != nil {
+	endpoints, err := h.Store.ListEndpoints(r.Context(), 50)
+	if err != nil {
+		log.Printf("failed to list endpoints: %v", err)
+		endpoints = []*store.Endpoint{}
+	}
+
+	data := struct {
+		Endpoints []*store.Endpoint
+		Host      string
+	}{
+		Endpoints: endpoints,
+		Host:      r.Host,
+	}
+
+	if err := homeTemplate.ExecuteTemplate(w, "layout", data); err != nil {
 		log.Printf("template execution error: %v", err)
 		http.Error(w, "failed to render page", http.StatusInternalServerError)
 		return
@@ -44,6 +58,15 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get other endpoints for switching
+	allEndpoints, _ := h.Store.ListEndpoints(r.Context(), 20)
+	otherEndpoints := []*store.Endpoint{}
+	for _, e := range allEndpoints {
+		if e.ID != endpointID {
+			otherEndpoints = append(otherEndpoints, e)
+		}
+	}
+
 	type requestDetailData struct {
 		*store.Request
 		HeadersMap map[string][]string
@@ -60,15 +83,17 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Endpoint     *store.Endpoint
-		Requests     []*store.Request
-		FirstRequest *requestDetailData
-		Host         string
+		Endpoint       *store.Endpoint
+		Requests       []*store.Request
+		FirstRequest   *requestDetailData
+		OtherEndpoints []*store.Endpoint
+		Host           string
 	}{
-		Endpoint:     endpoint,
-		Requests:     requests,
-		FirstRequest: firstRequest,
-		Host:         r.Host,
+		Endpoint:       endpoint,
+		Requests:       requests,
+		FirstRequest:   firstRequest,
+		OtherEndpoints: otherEndpoints,
+		Host:           r.Host,
 	}
 
 	if err := dashboardTemplate.ExecuteTemplate(w, "layout", data); err != nil {

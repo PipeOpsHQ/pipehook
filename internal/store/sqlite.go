@@ -81,6 +81,31 @@ func (s *SQLiteStore) DeleteEndpoint(ctx context.Context, id string) error {
 	return err
 }
 
+func (s *SQLiteStore) ListEndpoints(ctx context.Context, limit int) ([]*Endpoint, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, alias, created_at, expires_at
+		FROM endpoints
+		WHERE expires_at > ?
+		ORDER BY created_at DESC
+		LIMIT ?
+	`, time.Now(), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var endpoints []*Endpoint
+	for rows.Next() {
+		var e Endpoint
+		err := rows.Scan(&e.ID, &e.Alias, &e.CreatedAt, &e.ExpiresAt)
+		if err != nil {
+			return nil, err
+		}
+		endpoints = append(endpoints, &e)
+	}
+	return endpoints, nil
+}
+
 func (s *SQLiteStore) SaveRequest(ctx context.Context, req *Request) error {
 	now := time.Now()
 	res, err := s.db.ExecContext(ctx, `
