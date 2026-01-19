@@ -27,12 +27,27 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Printf("Incoming %s request to %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+	log.Printf("Headers: %v", r.Header)
+
 	// Read body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("Error reading body for %s %s: %v", r.Method, r.URL.Path, err)
 		http.Error(w, "failed to read body", http.StatusInternalServerError)
 		return
+	}
+	defer r.Body.Close()
+
+	log.Printf("Captured %d bytes. Content-Type: %s, User-Agent: %s", len(body), r.Header.Get("Content-Type"), r.UserAgent())
+	if len(body) > 0 {
+		previewLen := len(body)
+		if previewLen > 500 {
+			previewLen = 500
+		}
+		log.Printf("Body preview (first 500 bytes): %s", string(body[:previewLen]))
+	} else {
+		log.Printf("Warning: Captured body is empty!")
 	}
 
 	// Handle compression if present

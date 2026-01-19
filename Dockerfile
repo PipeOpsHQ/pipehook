@@ -24,23 +24,22 @@ FROM alpine:3.19
 
 WORKDIR /app
 
-# Create a non-root user
+# Create a non-root user and prepare data directory
 RUN addgroup -g 1000 appuser && \
-    adduser -D -u 1000 -G appuser appuser
+    adduser -D -u 1000 -G appuser appuser && \
+    mkdir -p /app/data && \
+    chown -R appuser:appuser /app && \
+    chmod 777 /app/data
 
 # Copy the binary from the builder stage
 COPY --from=builder /app/webhook .
 
-# Create a data directory for the SQLite database and set ownership
-RUN mkdir -p /app/data && \
-    chown -R appuser:appuser /app
-
-# Switch to non-root user
-USER appuser
-
 # Set environment variables
 ENV PORT=8080
 ENV DATABASE_PATH=/app/data/webhook.db
+
+# Switch to non-root user
+USER appuser
 
 # Expose the port
 EXPOSE 8080

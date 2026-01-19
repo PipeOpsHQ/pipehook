@@ -60,6 +60,38 @@
                 });
             }
         }
+
+        function formatTimeAgo(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const seconds = Math.floor((now - date) / 1000);
+
+            if (seconds < 5) return 'just now';
+            if (seconds < 60) return seconds + 's ago';
+
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return minutes + 'm ago';
+
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return hours + 'h ago';
+
+            const days = Math.floor(hours / 24);
+            if (days < 30) return days + 'd ago';
+
+            return date.toLocaleDateString();
+        }
+
+        function updateRelativeTimes() {
+            document.querySelectorAll('[data-timestamp]').forEach(el => {
+                const timestamp = el.getAttribute('data-timestamp');
+                if (timestamp) {
+                    el.innerText = formatTimeAgo(timestamp);
+                }
+            });
+        }
+
+        // Run every 10 seconds
+        setInterval(updateRelativeTimes, 10000);
     </script>
 </head>
 <body class="h-full antialiased bg-slate-950 flex flex-col">
@@ -93,7 +125,10 @@
     <div id="notifications" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
 
     <script>
-        window.addEventListener('DOMContentLoaded', updateHeaderRecents);
+        window.addEventListener('DOMContentLoaded', () => {
+            updateHeaderRecents();
+            updateRelativeTimes();
+        });
 
         // Custom toast notification system
         function showToast(message, type = 'info', duration = 3000) {

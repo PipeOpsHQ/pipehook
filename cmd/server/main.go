@@ -20,6 +20,31 @@ func main() {
 	if dbPath == "" {
 		dbPath = "webhook.db"
 	}
+
+	// Ensure the directory exists and is writable
+	dbDir := "."
+	if strings.Contains(dbPath, "/") {
+		// Use filepath.Dir if we wanted to import it, but simple split is enough here
+		parts := strings.Split(dbPath, "/")
+		dbDir = strings.Join(parts[:len(parts)-1], "/")
+	}
+
+	log.Printf("Checking database directory: %s", dbDir)
+	if _, err := os.Stat(dbDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dbDir, 0777); err != nil {
+			log.Printf("Warning: failed to create database directory: %v", err)
+		}
+	}
+
+	// Test if directory is writable
+	testFile := dbDir + "/.write_test"
+	if err := os.WriteFile(testFile, []byte("test"), 0666); err != nil {
+		log.Printf("CRITICAL: Database directory %s is NOT writable: %v", dbDir, err)
+	} else {
+		os.Remove(testFile)
+		log.Printf("Database directory %s is writable", dbDir)
+	}
+
 	s, err := store.NewSQLiteStore(dbPath)
 	if err != nil {
 		log.Fatal(err)

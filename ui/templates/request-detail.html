@@ -17,7 +17,6 @@
             </button>
             <button class="text-[10px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded-md transition-all active:scale-95 flex items-center gap-1.5 shadow-lg shadow-red-600/5"
                     hx-delete="/r/{{ .ID }}"
-                    hx-confirm="Are you sure you want to delete this request?"
                     hx-target="body"
                     hx-swap="none"
                     hx-on::after-request="if(event.detail.xhr.status === 200) { window.location.href = '/{{ .EndpointID }}'; }">

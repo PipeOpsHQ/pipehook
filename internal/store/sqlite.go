@@ -31,6 +31,12 @@ func NewSQLiteStore(dsn string) (*SQLiteStore, error) {
 }
 
 func (s *SQLiteStore) init() error {
+	// Enable WAL mode and other optimizations
+	_, _ = s.db.Exec("PRAGMA journal_mode=WAL;")
+	_, _ = s.db.Exec("PRAGMA synchronous=NORMAL;")
+	_, _ = s.db.Exec("PRAGMA foreign_keys=ON;")
+	_, _ = s.db.Exec("PRAGMA busy_timeout=5000;")
+
 	query := `
 	CREATE TABLE IF NOT EXISTS endpoints (
 		id TEXT PRIMARY KEY,

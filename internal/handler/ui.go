@@ -112,7 +112,8 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 			}
 			for i := 0; i < sampleSize; i++ {
 				b := requests[0].Body[i]
-				if b < 32 && b != 9 && b != 10 && b != 13 {
+				// Allow common control characters: 9 (tab), 10 (LF), 13 (CR), 27 (ESC/ANSI)
+				if b < 32 && b != 9 && b != 10 && b != 13 && b != 27 {
 					nonPrintableCount++
 				}
 			}
@@ -205,7 +206,8 @@ func (h *Handler) RequestDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		for i := 0; i < sampleSize; i++ {
 			b := req.Body[i]
-			if b < 32 && b != 9 && b != 10 && b != 13 {
+			// Allow common control characters: 9 (tab), 10 (LF), 13 (CR), 27 (ESC/ANSI)
+			if b < 32 && b != 9 && b != 10 && b != 13 && b != 27 {
 				nonPrintableCount++
 			}
 		}

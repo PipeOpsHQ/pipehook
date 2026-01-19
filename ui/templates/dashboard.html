@@ -130,6 +130,11 @@
                             const current = parseInt(requestCount.innerText) || 0;
                             requestCount.innerText = current + 1;
                         }
+
+                        // Update relative times for the new item
+                        if (typeof updateRelativeTimes === 'function') {
+                            updateRelativeTimes();
+                        }
                     }
                 }
             };
@@ -156,14 +161,13 @@
              hx-swap="innerHTML">
             <div class="flex items-center justify-between mb-2">
                 <span class="text-xs font-bold {{ if eq .Method "GET" }}text-emerald-500 bg-emerald-500/10 border-emerald-500/20{{ else }}text-brand-400 bg-brand-500/10 border-brand-500/20{{ end }} font-mono px-2 py-0.5 rounded border">{{ .Method }}</span>
-                <span class="text-[10px] text-slate-500 font-mono tracking-tighter">{{ .CreatedAt.Format "15:04:05" }}</span>
+                <span class="text-[10px] text-slate-500 font-mono tracking-tighter" data-timestamp="{{ .CreatedAt.Format "2006-01-02T15:04:05Z07:00" }}">{{ .CreatedAt.Format "15:04:05" }}</span>
             </div>
             <p class="text-sm text-slate-300 font-mono truncate group-hover:text-white transition-colors">{{ .Path }}</p>
             <p class="text-[10px] text-slate-600 font-mono mt-1.5 truncate">{{ .RemoteAddr }}</p>
         </div>
         <button class="opacity-0 group-hover:opacity-100 transition-opacity text-slate-600 hover:text-red-500 p-1.5 rounded hover:bg-slate-800/50"
                 hx-delete="/r/{{ .ID }}"
-                hx-confirm="Delete this request?"
                 hx-target="closest li"
                 hx-swap="outerHTML"
                 hx-on::after-request="if(event.detail.xhr.status === 200) { this.closest('li').remove(); const count = document.getElementById('request-count'); if(count) { const current = parseInt(count.innerText) || 0; count.innerText = Math.max(0, current - 1); } }"
