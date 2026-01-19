@@ -37,12 +37,22 @@
                     Headers
                     <i id="headers-chevron" class="fas fa-chevron-down text-[8px] transition-transform"></i>
                 </button>
-                <button onclick="copyHeaders()" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800" title="Copy headers">
-                    <i class="far fa-copy text-xs"></i>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button onclick="toggleHeadersView()" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800" title="Toggle view" id="headers-view-toggle">
+                        <i class="fas fa-code text-xs"></i>
+                    </button>
+                    <button onclick="copyHeaders()" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800" title="Copy headers">
+                        <i class="far fa-copy text-xs"></i>
+                    </button>
+                </div>
             </div>
             <div id="headers-section" class="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden shadow-inner">
-                <div id="headers-raw" class="divide-y divide-slate-800/30">
+                <!-- JSON View (default) -->
+                <div id="headers-json-view" class="p-4">
+                    <pre class="text-xs font-mono text-slate-200 whitespace-pre overflow-x-auto m-0">{{ .HeadersJSON }}</pre>
+                </div>
+                <!-- List View (hidden by default) -->
+                <div id="headers-list-view" class="divide-y divide-slate-800/30 hidden">
                     {{ range $key, $values := .HeadersMap }}
                     <div class="px-4 py-3 hover:bg-slate-800/40 transition-colors">
                         <div class="text-[10px] text-slate-500 font-mono font-semibold mb-1 uppercase tracking-wider">{{ $key }}</div>
@@ -310,10 +320,38 @@
             }
             window.copyBody = copyBody;
 
+            let headersViewMode = 'json'; // Default to JSON view
+
+            function toggleHeadersView() {
+                const jsonView = document.getElementById('headers-json-view');
+                const listView = document.getElementById('headers-list-view');
+                const toggleBtn = document.getElementById('headers-view-toggle');
+
+                if (!jsonView || !listView || !toggleBtn) return;
+
+                if (headersViewMode === 'json') {
+                    // Switch to list view
+                    jsonView.classList.add('hidden');
+                    listView.classList.remove('hidden');
+                    toggleBtn.innerHTML = '<i class="fas fa-list-ul text-xs"></i>';
+                    headersViewMode = 'list';
+                } else {
+                    // Switch to JSON view
+                    jsonView.classList.remove('hidden');
+                    listView.classList.add('hidden');
+                    toggleBtn.innerHTML = '<i class="fas fa-code text-xs"></i>';
+                    headersViewMode = 'json';
+                }
+            }
+            window.toggleHeadersView = toggleHeadersView;
+
             function copyHeaders() {
-                const headersRaw = document.getElementById('headers-raw');
-                if (!headersRaw) return;
-                const text = headersRaw.innerText || headersRaw.textContent || '';
+                const jsonView = document.getElementById('headers-json-view');
+                const listView = document.getElementById('headers-list-view');
+                const activeView = headersViewMode === 'json' ? jsonView : listView;
+
+                if (!activeView) return;
+                const text = activeView.innerText || activeView.textContent || '';
                 navigator.clipboard.writeText(text).then(() => {
                     if (typeof showToast === 'function') {
                         showToast('Headers copied to clipboard', 'success');

@@ -20,15 +20,23 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o webhook ./cmd/server/main.go
 
 # Final stage
-FROM alpine:latest
+FROM alpine:3.19
 
 WORKDIR /app
+
+# Create a non-root user
+RUN addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser
 
 # Copy the binary from the builder stage
 COPY --from=builder /app/webhook .
 
-# Create a data directory for the SQLite database
-RUN mkdir -p /app/data
+# Create a data directory for the SQLite database and set ownership
+RUN mkdir -p /app/data && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
 
 # Set environment variables
 ENV PORT=8080

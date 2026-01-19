@@ -71,6 +71,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	type requestDetailData struct {
 		*store.Request
 		HeadersMap  map[string][]string
+		HeadersJSON string
 		BodyString  string
 		ContentType string
 		IsBinary    bool
@@ -80,6 +81,9 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	if len(requests) > 0 {
 		var headers map[string][]string
 		json.Unmarshal([]byte(requests[0].Headers), &headers)
+
+		// Format headers as JSON for display
+		headersJSON, _ := json.MarshalIndent(headers, "", "  ")
 
 		// Detect content type
 		contentType := "text/plain"
@@ -114,6 +118,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		firstRequest = &requestDetailData{
 			Request:     requests[0],
 			HeadersMap:  headers,
+			HeadersJSON: string(headersJSON),
 			BodyString:  string(requests[0].Body),
 			ContentType: contentType,
 			IsBinary:    isBinary,
@@ -153,6 +158,9 @@ func (h *Handler) RequestDetail(w http.ResponseWriter, r *http.Request) {
 	var headers map[string][]string
 	json.Unmarshal([]byte(req.Headers), &headers)
 
+	// Format headers as JSON for display
+	headersJSON, _ := json.MarshalIndent(headers, "", "  ")
+
 	// Detect content type from headers
 	contentType := "text/plain"
 	if ct, ok := headers["Content-Type"]; ok && len(ct) > 0 {
@@ -188,12 +196,14 @@ func (h *Handler) RequestDetail(w http.ResponseWriter, r *http.Request) {
 	data := struct {
 		*store.Request
 		HeadersMap  map[string][]string
+		HeadersJSON string
 		BodyString  string
 		ContentType string
 		IsBinary    bool
 	}{
 		Request:     req,
 		HeadersMap:  headers,
+		HeadersJSON: string(headersJSON),
 		BodyString:  string(req.Body),
 		ContentType: contentType,
 		IsBinary:    isBinary,
