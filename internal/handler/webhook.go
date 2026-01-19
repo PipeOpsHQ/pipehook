@@ -27,10 +27,14 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Incoming %s request to %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
-	log.Printf("Headers: %v", r.Header)
+	// Log request details
+	contentLength := r.ContentLength
+	contentType := r.Header.Get("Content-Type")
 
-	// Read body
+	log.Printf("Incoming %s request to %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
+	log.Printf("Content-Length header: %d, Content-Type: %s", contentLength, contentType)
+
+	// Read body - even if Content-Length is 0, we should still try to read
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		log.Printf("Error reading body for %s %s: %v", r.Method, r.URL.Path, err)
@@ -39,15 +43,22 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	log.Printf("Captured %d bytes. Content-Type: %s, User-Agent: %s", len(body), r.Header.Get("Content-Type"), r.UserAgent())
-	if len(body) > 0 {
-		previewLen := len(body)
+	actualBodyLen := len(body)
+	log.Printf("Captured %d bytes (Content-Length was %d). Content-Type: %s, User-Agent: %s",
+		actualBodyLen, contentLength, contentType, r.UserAgent())
+
+	if actualBodyLen > 0 {
+		previewLen := actualBodyLen
 		if previewLen > 500 {
 			previewLen = 500
 		}
-		log.Printf("Body preview (first 500 bytes): %s", string(body[:previewLen]))
+		log.Printf("Body preview (first %d bytes): %q", previewLen, string(body[:previewLen]))
+	} else if contentLength > 0 {
+		// Content-Length says there should be a body, but we got nothing
+		log.Printf("WARNING: Content-Length=%d but captured 0 bytes! Body may have been consumed by middleware or proxy.", contentLength)
 	} else {
-		log.Printf("Warning: Captured body is empty!")
+		// Content-Length is 0, so empty body is expected
+		log.Printf("Empty body (Content-Length=0, this is expected)")
 	}
 
 	// Handle compression if present
