@@ -63,15 +63,65 @@
                 </h4>
                 <div class="flex items-center gap-3">
                     <span class="text-[10px] text-slate-600 bg-slate-900/50 border border-slate-800 px-2 py-0.5 rounded font-mono">{{ len .Body }} bytes</span>
+                    <button onclick="formatBody()" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800" title="Format JSON">
+                        <i class="fas fa-indent text-xs"></i>
+                    </button>
                     <button onclick="navigator.clipboard.writeText(document.getElementById('body-raw').innerText)" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800">
                         <i class="far fa-copy text-xs"></i>
                     </button>
                 </div>
             </div>
-            <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-5 shadow-inner">
-                <pre id="body-raw" class="text-xs text-slate-300 font-mono whitespace-pre-wrap break-all leading-relaxed">{{ if .Body }}{{ printf "%s" .Body }}{{ else }}<span class="text-slate-700 italic">Empty body</span>{{ end }}</pre>
+            <div class="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+                <!-- Editor Header Bar -->
+                <div class="bg-slate-900 border-b border-slate-800 px-4 py-2 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="flex gap-1.5">
+                            <div class="w-2.5 h-2.5 rounded-full bg-red-500/60"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-yellow-500/60"></div>
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-500/60"></div>
+                        </div>
+                        <span class="text-[10px] text-slate-500 font-mono ml-2">body</span>
+                    </div>
+                </div>
+                <!-- Code Editor Content -->
+                <div class="relative overflow-auto max-h-[500px] custom-scrollbar">
+                    <div class="flex">
+                        <!-- Line Numbers -->
+                        <div id="line-numbers" class="bg-slate-900/80 text-slate-600 text-[11px] font-mono py-3 px-3 text-right select-none border-r border-slate-800/50 sticky left-0"></div>
+                        <!-- Code Content -->
+                        <pre id="body-raw" class="flex-1 text-[11px] text-slate-200 font-mono py-3 px-4 m-0 leading-relaxed whitespace-pre overflow-x-auto">{{ if .Body }}{{ printf "%s" .Body }}{{ else }}<span class="text-slate-600 italic">Empty body</span>{{ end }}</pre>
+                    </div>
+                </div>
             </div>
         </div>
+    </div>
+
+    <script>
+        (function() {
+            const bodyRaw = document.getElementById('body-raw');
+            const lineNumbers = document.getElementById('line-numbers');
+
+            function updateLineNumbers() {
+                const text = bodyRaw.innerText || bodyRaw.textContent || '';
+                const lines = text.split('\n');
+                lineNumbers.innerHTML = lines.map((_, i) => `<div class="leading-relaxed">${i + 1}</div>`).join('');
+            }
+
+            function formatBody() {
+                const text = bodyRaw.innerText || bodyRaw.textContent || '';
+                try {
+                    const json = JSON.parse(text);
+                    bodyRaw.textContent = JSON.stringify(json, null, 2);
+                    updateLineNumbers();
+                } catch (e) {
+                    // Not JSON, do nothing
+                }
+            }
+
+            window.formatBody = formatBody;
+            updateLineNumbers();
+        })();
+    </script>
     </div>
 </div>
 {{ end }}
