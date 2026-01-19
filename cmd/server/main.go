@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -27,8 +28,18 @@ func main() {
 	h := handler.NewHandler(s)
 
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+
+	// Logger middleware - skip for webhook routes to preserve body
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !strings.HasPrefix(r.URL.Path, "/h/") {
+				middleware.Logger(next).ServeHTTP(w, r)
+			} else {
+				next.ServeHTTP(w, r)
+			}
+		})
+	})
 
 	// Static files (must be before catch-all routes)
 	r.Handle("/static/*", http.FileServer(http.FS(ui.FS)))
