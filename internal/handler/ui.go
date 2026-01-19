@@ -98,6 +98,13 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		// Check if binary (only if significant portion is non-printable)
 		isBinary := false
 		if len(requests[0].Body) > 0 {
+			// If Content-Type suggests text/json, be extremely lenient
+			isTextType := false
+			ct := strings.ToLower(contentType)
+			if strings.Contains(ct, "json") || strings.Contains(ct, "text") || strings.Contains(ct, "xml") || strings.Contains(ct, "html") || strings.Contains(ct, "form-urlencoded") {
+				isTextType = true
+			}
+
 			nonPrintableCount := 0
 			sampleSize := len(requests[0].Body)
 			if sampleSize > 1000 {
@@ -109,8 +116,16 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 					nonPrintableCount++
 				}
 			}
-			// Consider binary if more than 10% of bytes are non-printable
-			if sampleSize > 0 && float64(nonPrintableCount)/float64(sampleSize) > 0.1 {
+
+			// Thresholds:
+			// If text type: 50% non-printable to consider binary (very lenient)
+			// If unknown: 25% non-printable
+			threshold := 0.25
+			if isTextType {
+				threshold = 0.50
+			}
+
+			if sampleSize > 0 && float64(nonPrintableCount)/float64(sampleSize) > threshold {
 				isBinary = true
 			}
 		}
@@ -176,6 +191,13 @@ func (h *Handler) RequestDetail(w http.ResponseWriter, r *http.Request) {
 	// Only consider it binary if a significant portion is non-printable
 	isBinary := false
 	if len(req.Body) > 0 {
+		// If Content-Type suggests text/json, be extremely lenient
+		isTextType := false
+		ct := strings.ToLower(contentType)
+		if strings.Contains(ct, "json") || strings.Contains(ct, "text") || strings.Contains(ct, "xml") || strings.Contains(ct, "html") || strings.Contains(ct, "form-urlencoded") {
+			isTextType = true
+		}
+
 		nonPrintableCount := 0
 		sampleSize := len(req.Body)
 		if sampleSize > 1000 {
@@ -187,8 +209,16 @@ func (h *Handler) RequestDetail(w http.ResponseWriter, r *http.Request) {
 				nonPrintableCount++
 			}
 		}
-		// Consider binary if more than 10% of bytes are non-printable
-		if sampleSize > 0 && float64(nonPrintableCount)/float64(sampleSize) > 0.1 {
+
+		// Thresholds:
+		// If text type: 50% non-printable to consider binary (very lenient)
+		// If unknown: 25% non-printable
+		threshold := 0.25
+		if isTextType {
+			threshold = 0.50
+		}
+
+		if sampleSize > 0 && float64(nonPrintableCount)/float64(sampleSize) > threshold {
 			isBinary = true
 		}
 	}
