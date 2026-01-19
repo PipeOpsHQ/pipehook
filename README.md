@@ -14,7 +14,7 @@ A lightweight, high-performance webhook inspector built with pure Go and SQLite.
 ```bash
 go run cmd/server/main.go
 ```
-The server will be available at `http://localhost:8080`.
+The server will be available at `https://localhost:8080`.
 
 ## Running with Docker
 
@@ -24,14 +24,14 @@ You can use the pre-built image from GitHub Container Registry:
 docker run -p 8080:8080 \
   -v $(pwd)/data:/app/data \
   -e DATABASE_PATH=/app/data/webhook.db \
-  ghcr.io/YOUR_USERNAME/webhook:main
+  ghcr.io/pipeopshq/pipehook:main
 ```
 
 Or build it yourself:
 
 ```bash
-docker build -t webhook .
-docker run -p 8080:8080 -v $(pwd)/data:/app/data webhook
+docker build -t pipehook .
+docker run -p 8080:8080 -v $(pwd)/data:/app/data pipehook
 ```
 
 ## Environment Variables

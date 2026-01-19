@@ -4,8 +4,8 @@ import (
 	"html/template"
 	"sync"
 
-	"github.com/nitrocode/webhook/internal/store"
-	"github.com/nitrocode/webhook/ui"
+	"github.com/PipeOpsHQ/pipehook/internal/store"
+	"github.com/PipeOpsHQ/pipehook/ui"
 )
 
 var (

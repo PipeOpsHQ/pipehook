@@ -9,8 +9,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/nitrocode/webhook/internal/handler"
-	"github.com/nitrocode/webhook/internal/store"
+	"github.com/PipeOpsHQ/pipehook/internal/handler"
+	"github.com/PipeOpsHQ/pipehook/internal/store"
+	"github.com/PipeOpsHQ/pipehook/ui"
 )
 
 func main() {
@@ -36,6 +37,14 @@ func main() {
 	r.Get("/r/{requestID}", h.RequestDetail)
 	r.Post("/r/{requestID}/replay", h.ReplayRequest)
 	r.Get("/sse/{endpointID}", h.SSE)
+
+	// Static files
+	fileServer := http.FileServer(http.FS(ui.FS))
+	r.Handle("/static/*", fileServer)
+	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		r.URL.Path = "/static/pipehook.svg"
+		fileServer.ServeHTTP(w, r)
+	})
 
 	// Webhook receiver
 	r.HandleFunc("/h/{endpointID}", h.CaptureWebhook)

@@ -1,4 +1,4 @@
-module github.com/nitrocode/webhook
+module github.com/PipeOpsHQ/pipehook
 
 go 1.24.0
 

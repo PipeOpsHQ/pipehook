@@ -3,8 +3,11 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -18,11 +21,18 @@ func (h *Handler) ReplayRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Prepare the request to be replayed
-	// We'll replay it to the same endpoint path on this server
-	targetURL := "http://" + r.Host + "/h/" + reqData.EndpointID + reqData.Path
+	// Determine the protocol (default to http, but check for https)
+	proto := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		proto = "https"
+	}
 
-	client := &http.Client{}
+	// Prepare the request to be replayed
+	targetURL := fmt.Sprintf("%s://%s/h/%s%s", proto, r.Host, reqData.EndpointID, reqData.Path)
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
 	newReq, err := http.NewRequest(reqData.Method, targetURL, bytes.NewReader(reqData.Body))
 	if err != nil {
 		http.Error(w, "failed to create replay request", http.StatusInternalServerError)
@@ -35,7 +45,8 @@ func (h *Handler) ReplayRequest(w http.ResponseWriter, r *http.Request) {
 		for k, v := range headers {
 			for _, val := range v {
 				// Don't replay certain headers that should be unique to the new request
-				if k == "Host" || k == "Content-Length" || k == "Connection" {
+				kLower := strings.ToLower(k)
+				if kLower == "host" || kLower == "content-length" || kLower == "connection" || kLower == "accept-encoding" {
 					continue
 				}
 				newReq.Header.Add(k, val)
@@ -50,6 +61,7 @@ func (h *Handler) ReplayRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	w.Header().Set("HX-Trigger", "requestReplayed")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Replayed successfully. Response status: " + resp.Status))
+	fmt.Fprintf(w, "Replayed successfully (Status: %s)", resp.Status)
 }

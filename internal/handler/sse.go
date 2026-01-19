@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/nitrocode/webhook/internal/store"
+	"github.com/PipeOpsHQ/pipehook/internal/store"
 )
 
 func (h *Handler) SSE(w http.ResponseWriter, r *http.Request) {
@@ -19,6 +20,12 @@ func (h *Handler) SSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	// Flush the headers to establish the connection
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
 
 	ch := make(chan *store.Request, 10)
 	h.clientsMu.Lock()
@@ -35,7 +42,11 @@ func (h *Handler) SSE(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		h.clientsMu.Unlock()
+		close(ch)
 	}()
+
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {
@@ -47,13 +58,23 @@ func (h *Handler) SSE(w http.ResponseWriter, r *http.Request) {
 			err := dashboardTemplate.ExecuteTemplate(&buf, "request-item", req)
 			if err != nil {
 				fmt.Fprintf(w, "event: error\ndata: %v\n\n", err)
-				w.(http.Flusher).Flush()
+				if flusher, ok := w.(http.Flusher); ok {
+					flusher.Flush()
+				}
 				continue
 			}
 			// SSE data cannot have newlines unless prefixed with "data: "
 			data := bytes.ReplaceAll(buf.Bytes(), []byte("\n"), []byte(""))
 			fmt.Fprintf(w, "event: new-request\ndata: %s\n\n", data)
-			w.(http.Flusher).Flush()
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
+		case <-ticker.C:
+			// Heartbeat to keep connection alive
+			fmt.Fprintf(w, ": keepalive\n\n")
+			if flusher, ok := w.(http.Flusher); ok {
+				flusher.Flush()
+			}
 		case <-r.Context().Done():
 			return
 		}

@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PipeHooks</title>
+    <link rel="icon" type="image/svg+xml" href="/static/pipehook.svg">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/sse.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -33,18 +34,31 @@
 <body class="h-full antialiased bg-slate-950 flex flex-col">
     <header class="h-12 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between px-4 shrink-0">
         <a href="/" class="flex items-center gap-2 text-brand-500 font-bold text-sm tracking-tight">
-            <i class="fas fa-bolt text-xs"></i>
+            <img src="/static/pipehook.svg" class="w-4 h-4" alt="PipeHooks">
             <span>PipeHooks</span>
         </a>
         <div class="flex items-center gap-4 text-xs text-slate-500">
             <a href="https://pipeops.io" target="_blank" class="hover:text-slate-300">PipeOps</a>
             <span class="w-px h-3 bg-slate-800"></span>
-            <a href="https://github.com/nitrocode/webhook" target="_blank" class="hover:text-slate-300"><i class="fab fa-github"></i></a>
+            <a href="https://github.com/PipeOpsHQ/pipehook" target="_blank" class="hover:text-slate-300"><i class="fab fa-github"></i></a>
         </div>
     </header>
-    <main class="flex-1 overflow-hidden">
+            <main class="flex-1 overflow-hidden">
         {{ template "content" . }}
     </main>
+
+    <div id="notifications" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <script>
+        document.body.addEventListener('requestReplayed', function(evt) {
+            const notifications = document.getElementById('notifications');
+            const toast = document.createElement('div');
+            toast.className = 'bg-emerald-600 text-white px-4 py-2 rounded-lg shadow-lg text-xs font-bold flex items-center gap-2 animate-bounce';
+            toast.innerHTML = '<i class="fas fa-check-circle"></i> Request replayed successfully';
+            notifications.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        });
+    </script>
 </body>
 </html>
 {{ end }}

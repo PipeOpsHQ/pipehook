@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/nitrocode/webhook/internal/store"
+	"github.com/PipeOpsHQ/pipehook/internal/store"
 )
 
 func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {

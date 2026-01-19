@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/nitrocode/webhook/internal/store"
+	"github.com/PipeOpsHQ/pipehook/internal/store"
 )
 
 func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
@@ -39,14 +39,31 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	type requestDetailData struct {
+		*store.Request
+		HeadersMap map[string][]string
+	}
+
+	var firstRequest *requestDetailData
+	if len(requests) > 0 {
+		var headers map[string][]string
+		json.Unmarshal([]byte(requests[0].Headers), &headers)
+		firstRequest = &requestDetailData{
+			Request:    requests[0],
+			HeadersMap: headers,
+		}
+	}
+
 	data := struct {
-		Endpoint *store.Endpoint
-		Requests []*store.Request
-		Host     string
+		Endpoint     *store.Endpoint
+		Requests     []*store.Request
+		FirstRequest *requestDetailData
+		Host         string
 	}{
-		Endpoint: endpoint,
-		Requests: requests,
-		Host:     r.Host,
+		Endpoint:     endpoint,
+		Requests:     requests,
+		FirstRequest: firstRequest,
+		Host:         r.Host,
 	}
 
 	dashboardTemplate.ExecuteTemplate(w, "layout", data)
