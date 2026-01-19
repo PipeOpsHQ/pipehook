@@ -57,9 +57,17 @@ func main() {
 	r.Get("/ws/{endpointID}", h.WebSocket)
 	r.Get("/{endpointID}", h.Dashboard)
 
-	// Webhook receiver
+	// Webhook receiver - accept ALL HTTP methods (GET, POST, PUT, PATCH, DELETE, etc.)
+	// Using HandleFunc which accepts all methods, and also explicitly registering common methods
 	r.HandleFunc("/h/{endpointID}", h.CaptureWebhook)
 	r.HandleFunc("/h/{endpointID}/*", h.CaptureWebhook)
+
+	// Explicitly register all common HTTP methods to ensure body is captured
+	methods := []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD", "CONNECT", "TRACE"}
+	for _, method := range methods {
+		r.MethodFunc(method, "/h/{endpointID}", h.CaptureWebhook)
+		r.MethodFunc(method, "/h/{endpointID}/*", h.CaptureWebhook)
+	}
 
 	// Cleanup worker
 	go func() {

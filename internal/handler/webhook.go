@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -23,12 +24,15 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Read body - this works for all HTTP methods (GET, POST, PUT, PATCH, DELETE, etc.)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		log.Printf("Error reading body for %s %s: %v", r.Method, r.URL.Path, err)
 		http.Error(w, "failed to read body", http.StatusInternalServerError)
 		return
 	}
 
+	// Capture all headers
 	headersMap := make(map[string][]string)
 	for k, v := range r.Header {
 		headersMap[k] = v
@@ -46,12 +50,14 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.Store.SaveRequest(r.Context(), req); err != nil {
+		log.Printf("Error saving request: %v", err)
 		http.Error(w, "failed to save request", http.StatusInternalServerError)
 		return
 	}
 
 	h.Broadcast(endpointID, req)
 
+	// Return success response
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("ok"))
 }

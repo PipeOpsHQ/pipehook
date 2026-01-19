@@ -37,21 +37,19 @@
                     Headers
                     <i id="headers-chevron" class="fas fa-chevron-down text-[8px] transition-transform"></i>
                 </button>
-                <button onclick="navigator.clipboard.writeText(document.getElementById('headers-raw').innerText)" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800">
+                <button onclick="copyHeaders()" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800" title="Copy headers">
                     <i class="far fa-copy text-xs"></i>
                 </button>
             </div>
             <div id="headers-section" class="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden shadow-inner">
-                <table class="w-full text-left text-xs font-mono">
-                    <tbody id="headers-raw">
-                        {{ range $key, $values := .HeadersMap }}
-                        <tr class="border-b border-slate-800/30 last:border-0 hover:bg-slate-800/40 transition-colors">
-                            <td class="py-2.5 px-4 text-slate-500 w-1/4 border-r border-slate-800/30 font-semibold">{{ $key }}</td>
-                            <td class="py-2.5 px-4 text-brand-300 break-all">{{ index $values 0 }}</td>
-                        </tr>
-                        {{ end }}
-                    </tbody>
-                </table>
+                <div id="headers-raw" class="divide-y divide-slate-800/30">
+                    {{ range $key, $values := .HeadersMap }}
+                    <div class="px-4 py-3 hover:bg-slate-800/40 transition-colors">
+                        <div class="text-[10px] text-slate-500 font-mono font-semibold mb-1 uppercase tracking-wider">{{ $key }}</div>
+                        <div class="text-xs text-brand-300 font-mono break-all">{{ index $values 0 }}</div>
+                    </div>
+                    {{ end }}
+                </div>
             </div>
         </div>
 
@@ -311,6 +309,22 @@
                 });
             }
             window.copyBody = copyBody;
+
+            function copyHeaders() {
+                const headersRaw = document.getElementById('headers-raw');
+                if (!headersRaw) return;
+                const text = headersRaw.innerText || headersRaw.textContent || '';
+                navigator.clipboard.writeText(text).then(() => {
+                    if (typeof showToast === 'function') {
+                        showToast('Headers copied to clipboard', 'success');
+                    }
+                }).catch(() => {
+                    if (typeof showToast === 'function') {
+                        showToast('Failed to copy', 'error');
+                    }
+                });
+            }
+            window.copyHeaders = copyHeaders;
 
             // Auto-format on load (only if bodyRaw exists, i.e., not binary)
             if (bodyRaw) {
