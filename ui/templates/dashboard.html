@@ -9,7 +9,9 @@
             </span>
         </div>
         <ul id="request-list" class="flex-1 overflow-y-auto custom-scrollbar divide-y divide-slate-800/50"
-            hx-ext="sse" sse-connect="/sse/{{ .Endpoint.ID }}" sse-swap="new-request" hx-swap="afterbegin">
+            hx-ext="sse"
+            sse-connect="/sse/{{ .Endpoint.ID }}"
+            sse-swap="new-request">
             {{ range .Requests }}
                 {{ template "request-item" . }}
             {{ end }}
@@ -61,10 +63,24 @@
         }
     })();
 
+    // Handle SSE events
+    document.body.addEventListener('htmx:sseMessage', function(evt) {
+        if (evt.detail.event === 'new-request') {
+            const count = document.getElementById('request-count');
+            if (count) {
+                const current = parseInt(count.innerText) || 0;
+                count.innerText = current + 1;
+            }
+        }
+    });
+
     document.body.addEventListener('htmx:afterSwap', function(evt) {
         if (evt.detail.target.id === 'request-list') {
             const count = document.getElementById('request-count');
-            if (count) count.innerText = parseInt(count.innerText) + 1;
+            if (count) {
+                const current = parseInt(count.innerText) || 0;
+                count.innerText = current + 1;
+            }
         }
     });
 </script>
@@ -72,7 +88,9 @@
 
 {{ define "request-item" }}
 <li class="group hover:bg-slate-800/40 cursor-pointer transition-all relative border-l-4 border-transparent active:bg-slate-800/60"
-    hx-get="/r/{{ .ID }}" hx-target="#request-detail"
+    hx-get="/r/{{ .ID }}"
+    hx-target="#request-detail"
+    hx-swap="innerHTML"
     onclick="document.querySelectorAll('#request-list li').forEach(el => el.classList.remove('bg-slate-800/50', 'border-brand-500', 'shadow-inner')); this.classList.add('bg-slate-800/50', 'border-brand-500', 'shadow-inner')">
     <div class="px-4 py-4">
         <div class="flex items-center justify-between mb-2">

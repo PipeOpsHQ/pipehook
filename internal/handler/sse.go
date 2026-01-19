@@ -63,9 +63,16 @@ func (h *Handler) SSE(w http.ResponseWriter, r *http.Request) {
 				}
 				continue
 			}
-			// SSE data cannot have newlines unless prefixed with "data: "
-			data := bytes.ReplaceAll(buf.Bytes(), []byte("\n"), []byte(""))
-			fmt.Fprintf(w, "event: new-request\ndata: %s\n\n", data)
+			// Format SSE data properly - each line needs "data: " prefix
+			htmlData := buf.Bytes()
+			lines := bytes.Split(htmlData, []byte("\n"))
+			fmt.Fprintf(w, "event: new-request\n")
+			for _, line := range lines {
+				if len(line) > 0 {
+					fmt.Fprintf(w, "data: %s\n", line)
+				}
+			}
+			fmt.Fprintf(w, "\n")
 			if flusher, ok := w.(http.Flusher); ok {
 				flusher.Flush()
 			}
