@@ -152,7 +152,7 @@
 {{ end }}
 
 {{ define "request-item" }}
-<li class="group hover:bg-slate-800/40 cursor-pointer transition-all relative border-l-4 border-transparent active:bg-slate-800/60"
+<li class="group hover:bg-slate-800/40 cursor-pointer transition-all relative border-l-4 border-transparent active:bg-slate-800/60" data-request-id="{{ .ID }}"
     onclick="document.querySelectorAll('#request-list li').forEach(el => el.classList.remove('bg-slate-800/50', 'border-brand-500', 'shadow-inner')); this.classList.add('bg-slate-800/50', 'border-brand-500', 'shadow-inner')">
     <div class="px-4 py-4 flex items-start justify-between gap-3">
         <div class="flex-1 min-w-0 cursor-pointer"
