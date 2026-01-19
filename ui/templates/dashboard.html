@@ -55,7 +55,11 @@
 </div>
 
 <script>
-    saveEndpoint('{{ .Endpoint.ID }}');
+    (function() {
+        if (typeof saveEndpoint === 'function') {
+            saveEndpoint('{{ .Endpoint.ID }}');
+        }
+    })();
 
     document.body.addEventListener('htmx:afterSwap', function(evt) {
         if (evt.detail.target.id === 'request-list') {

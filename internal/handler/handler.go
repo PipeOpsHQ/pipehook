@@ -10,7 +10,7 @@ import (
 
 var (
 	homeTemplate      = template.Must(template.ParseFS(ui.FS, "templates/layout.html", "templates/home.html"))
-	dashboardTemplate = template.Must(template.ParseFS(ui.FS, "templates/layout.html", "templates/dashboard.html"))
+	dashboardTemplate = template.Must(template.ParseFS(ui.FS, "templates/layout.html", "templates/dashboard.html", "templates/request-detail.html"))
 	detailTemplate    = template.Must(template.ParseFS(ui.FS, "templates/request-detail.html"))
 )
 

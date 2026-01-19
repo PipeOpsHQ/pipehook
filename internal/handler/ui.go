@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -12,7 +13,11 @@ import (
 )
 
 func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
-	homeTemplate.ExecuteTemplate(w, "layout", nil)
+	if err := homeTemplate.ExecuteTemplate(w, "layout", nil); err != nil {
+		log.Printf("template execution error: %v", err)
+		http.Error(w, "failed to render page", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *Handler) CreateEndpoint(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +71,11 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		Host:         r.Host,
 	}
 
-	dashboardTemplate.ExecuteTemplate(w, "layout", data)
+	if err := dashboardTemplate.ExecuteTemplate(w, "layout", data); err != nil {
+		log.Printf("template execution error: %v", err)
+		http.Error(w, "failed to render page", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *Handler) RequestDetail(w http.ResponseWriter, r *http.Request) {

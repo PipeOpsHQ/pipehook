@@ -30,21 +30,19 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	// Static files (must be before catch-all routes)
+	r.Handle("/static/*", http.FileServer(http.FS(ui.FS)))
+	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/static/pipehook.svg", http.StatusMovedPermanently)
+	})
+
 	// UI
 	r.Get("/", h.Home)
 	r.Post("/new", h.CreateEndpoint)
-	r.Get("/{endpointID}", h.Dashboard)
 	r.Get("/r/{requestID}", h.RequestDetail)
 	r.Post("/r/{requestID}/replay", h.ReplayRequest)
 	r.Get("/sse/{endpointID}", h.SSE)
-
-	// Static files
-	fileServer := http.FileServer(http.FS(ui.FS))
-	r.Handle("/static/*", fileServer)
-	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
-		r.URL.Path = "/static/pipehook.svg"
-		fileServer.ServeHTTP(w, r)
-	})
+	r.Get("/{endpointID}", h.Dashboard)
 
 	// Webhook receiver
 	r.HandleFunc("/h/{endpointID}", h.CaptureWebhook)
