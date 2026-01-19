@@ -73,7 +73,7 @@
                         <i class="fas fa-indent text-xs"></i>
                     </button>
                     {{ end }}
-                    <button onclick="navigator.clipboard.writeText(document.getElementById('body-raw').innerText)" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800">
+                    <button onclick="copyBody()" class="text-slate-600 hover:text-brand-400 transition-colors p-1 rounded hover:bg-slate-800" title="Copy body">
                         <i class="far fa-copy text-xs"></i>
                     </button>
                 </div>
@@ -290,6 +290,27 @@
             }
 
             window.formatBody = formatBody;
+
+            function copyBody() {
+                if (!bodyRaw) {
+                    // If binary, show message
+                    if (typeof showToast === 'function') {
+                        showToast('Cannot copy binary content', 'info');
+                    }
+                    return;
+                }
+                const text = bodyRaw.innerText || bodyRaw.textContent || '';
+                navigator.clipboard.writeText(text).then(() => {
+                    if (typeof showToast === 'function') {
+                        showToast('Body copied to clipboard', 'success');
+                    }
+                }).catch(() => {
+                    if (typeof showToast === 'function') {
+                        showToast('Failed to copy', 'error');
+                    }
+                });
+            }
+            window.copyBody = copyBody;
 
             // Auto-format on load (only if bodyRaw exists, i.e., not binary)
             if (bodyRaw) {

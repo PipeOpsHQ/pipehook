@@ -91,14 +91,23 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 			contentType = strings.TrimSpace(contentType)
 		}
 
-		// Check if binary
+		// Check if binary (only if significant portion is non-printable)
 		isBinary := false
 		if len(requests[0].Body) > 0 {
-			for _, b := range requests[0].Body {
+			nonPrintableCount := 0
+			sampleSize := len(requests[0].Body)
+			if sampleSize > 1000 {
+				sampleSize = 1000 // Sample first 1000 bytes for performance
+			}
+			for i := 0; i < sampleSize; i++ {
+				b := requests[0].Body[i]
 				if b < 32 && b != 9 && b != 10 && b != 13 {
-					isBinary = true
-					break
+					nonPrintableCount++
 				}
+			}
+			// Consider binary if more than 10% of bytes are non-printable
+			if sampleSize > 0 && float64(nonPrintableCount)/float64(sampleSize) > 0.1 {
+				isBinary = true
 			}
 		}
 
@@ -156,13 +165,23 @@ func (h *Handler) RequestDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if body is binary (non-printable characters)
+	// Only consider it binary if a significant portion is non-printable
 	isBinary := false
 	if len(req.Body) > 0 {
-		for _, b := range req.Body {
+		nonPrintableCount := 0
+		sampleSize := len(req.Body)
+		if sampleSize > 1000 {
+			sampleSize = 1000 // Sample first 1000 bytes for performance
+		}
+		for i := 0; i < sampleSize; i++ {
+			b := req.Body[i]
 			if b < 32 && b != 9 && b != 10 && b != 13 {
-				isBinary = true
-				break
+				nonPrintableCount++
 			}
+		}
+		// Consider binary if more than 10% of bytes are non-printable
+		if sampleSize > 0 && float64(nonPrintableCount)/float64(sampleSize) > 0.1 {
+			isBinary = true
 		}
 	}
 
