@@ -125,3 +125,35 @@ func (h *Handler) DeleteRequest(w http.ResponseWriter, r *http.Request) {
 	// Return empty response for HTMX to handle removal
 	w.WriteHeader(http.StatusOK)
 }
+
+func (h *Handler) DeleteEndpoint(w http.ResponseWriter, r *http.Request) {
+	endpointID := chi.URLParam(r, "endpointID")
+	if endpointID == "" {
+		http.Error(w, "missing endpoint ID", http.StatusBadRequest)
+		return
+	}
+
+	// Verify endpoint exists
+	_, err := h.Store.GetEndpoint(r.Context(), endpointID)
+	if err != nil {
+		http.Error(w, "endpoint not found", http.StatusNotFound)
+		return
+	}
+
+	// Close all WebSocket connections for this endpoint
+	h.clientsMu.Lock()
+	clients := h.clients[endpointID]
+	for _, conn := range clients {
+		conn.Close()
+	}
+	delete(h.clients, endpointID)
+	h.clientsMu.Unlock()
+
+	// Delete the endpoint (this will cascade delete all requests due to FOREIGN KEY)
+	if err := h.Store.DeleteEndpoint(r.Context(), endpointID); err != nil {
+		http.Error(w, "failed to delete endpoint", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
