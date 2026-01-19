@@ -34,13 +34,13 @@
             </div>
             <div class="flex items-center gap-3 whitespace-nowrap">
                 {{ if .OtherEndpoints }}
-                <div class="relative group">
-                    <button class="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
+                <div class="relative" id="switch-container">
+                    <button onclick="document.getElementById('switch-dropdown').classList.toggle('hidden')" class="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
                         <i class="fas fa-exchange-alt text-[10px]"></i>
                         Switch
                         <i class="fas fa-chevron-down text-[8px]"></i>
                     </button>
-                    <div class="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-lg shadow-xl py-1 z-50 hidden group-hover:block">
+                    <div id="switch-dropdown" class="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-lg shadow-xl py-1 z-50 hidden">
                         {{ range .OtherEndpoints }}
                         <a href="/{{ .ID }}" class="block px-4 py-2 text-[10px] font-mono text-slate-400 hover:text-white hover:bg-slate-800 truncate">
                             {{ .ID }}
@@ -87,56 +87,65 @@
     </div>
 </div>
 
-<script>
-    (function() {
-        if (typeof saveEndpoint === 'function') {
-            saveEndpoint('{{ .Endpoint.ID }}');
-        }
+    <script>
+        (function() {
+            if (typeof saveEndpoint === 'function') {
+                saveEndpoint('{{ .Endpoint.ID }}');
+            }
 
-        // WebSocket connection for real-time updates
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/{{ .Endpoint.ID }}`;
-        const ws = new WebSocket(wsUrl);
-        const requestList = document.getElementById('request-list');
-        const requestCount = document.getElementById('request-count');
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function(event) {
+                const container = document.getElementById('switch-container');
+                const dropdown = document.getElementById('switch-dropdown');
+                if (container && dropdown && !container.contains(event.target)) {
+                    dropdown.classList.add('hidden');
+                }
+            });
 
-        ws.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            if (data.type === 'new-request') {
-                // Create a temporary container to parse the HTML
-                const temp = document.createElement('div');
-                temp.innerHTML = data.payload;
-                const newItem = temp.querySelector('li');
+            // WebSocket connection for real-time updates
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/{{ .Endpoint.ID }}`;
+            const ws = new WebSocket(wsUrl);
+            const requestList = document.getElementById('request-list');
+            const requestCount = document.getElementById('request-count');
 
-                if (newItem && requestList) {
-                    requestList.insertBefore(newItem, requestList.firstChild);
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.type === 'new-request') {
+                    // Create a temporary container to parse the HTML
+                    const temp = document.createElement('div');
+                    temp.innerHTML = data.payload;
+                    const newItem = temp.querySelector('li');
 
-                    // Process HTMX attributes on the new element
-                    if (typeof htmx !== 'undefined') {
-                        htmx.process(newItem);
-                    }
+                    if (newItem && requestList) {
+                        requestList.insertBefore(newItem, requestList.firstChild);
 
-                    // Update count
-                    if (requestCount) {
-                        const current = parseInt(requestCount.innerText) || 0;
-                        requestCount.innerText = current + 1;
+                        // Process HTMX attributes on the new element
+                        if (typeof htmx !== 'undefined') {
+                            htmx.process(newItem);
+                        }
+
+                        // Update count
+                        if (requestCount) {
+                            const current = parseInt(requestCount.innerText) || 0;
+                            requestCount.innerText = current + 1;
+                        }
                     }
                 }
-            }
-        };
+            };
 
-        ws.onerror = function(error) {
-            console.error('WebSocket error:', error);
-        };
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
 
-        ws.onclose = function() {
-            // Attempt to reconnect after 3 seconds
-            setTimeout(function() {
-                location.reload();
-            }, 3000);
-        };
-    })();
-</script>
+            ws.onclose = function() {
+                // Attempt to reconnect after 3 seconds
+                setTimeout(function() {
+                    location.reload();
+                }, 3000);
+            };
+        })();
+    </script>
 {{ end }}
 
 {{ define "request-item" }}
