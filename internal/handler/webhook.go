@@ -27,12 +27,19 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Log request details
+	// Log request details BEFORE reading body
 	contentLength := r.ContentLength
 	contentType := r.Header.Get("Content-Type")
+	transferEncoding := r.Header.Get("Transfer-Encoding")
+	queryParams := r.URL.RawQuery
 
-	log.Printf("Incoming %s request to %s from %s", r.Method, r.URL.Path, r.RemoteAddr)
-	log.Printf("Content-Length header: %d, Content-Type: %s", contentLength, contentType)
+	log.Printf("=== REQUEST DEBUG ===")
+	log.Printf("Method: %s, Path: %s, RemoteAddr: %s", r.Method, r.URL.Path, r.RemoteAddr)
+	log.Printf("Content-Length header: %d", contentLength)
+	log.Printf("Content-Type: %s", contentType)
+	log.Printf("Transfer-Encoding: %s", transferEncoding)
+	log.Printf("Query params: %s", queryParams)
+	log.Printf("All headers: %+v", r.Header)
 
 	// Read body - even if Content-Length is 0, we should still try to read
 	body, err := io.ReadAll(r.Body)
@@ -44,8 +51,9 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	actualBodyLen := len(body)
-	log.Printf("Captured %d bytes (Content-Length was %d). Content-Type: %s, User-Agent: %s",
-		actualBodyLen, contentLength, contentType, r.UserAgent())
+	log.Printf("=== BODY DEBUG ===")
+	log.Printf("Content-Length header: %d, Actual bytes read: %d", contentLength, actualBodyLen)
+	log.Printf("Transfer-Encoding: %s", transferEncoding)
 
 	if actualBodyLen > 0 {
 		previewLen := actualBodyLen
@@ -55,11 +63,30 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Body preview (first %d bytes): %q", previewLen, string(body[:previewLen]))
 	} else if contentLength > 0 {
 		// Content-Length says there should be a body, but we got nothing
-		log.Printf("WARNING: Content-Length=%d but captured 0 bytes! Body may have been consumed by middleware or proxy.", contentLength)
+		log.Printf("⚠️  WARNING: Content-Length=%d but captured 0 bytes! Body may have been consumed by middleware or proxy.", contentLength)
+		log.Printf("⚠️  This suggests a proxy/load balancer may be stripping the body before it reaches the application.")
+	} else if transferEncoding == "chunked" {
+		// Chunked encoding might not have Content-Length
+		log.Printf("Transfer-Encoding is chunked but body is empty - this is unusual")
 	} else {
 		// Content-Length is 0, so empty body is expected
 		log.Printf("Empty body (Content-Length=0, this is expected)")
 	}
+
+	// Check if body might be in query parameters (some proxies do this)
+	if queryParams != "" && actualBodyLen == 0 {
+		log.Printf("⚠️  NOTE: Query params present but body is empty: %s", queryParams)
+	}
+
+	// For form-urlencoded with empty body, check if it's in query params
+	// (some systems send form data as query params when body is empty)
+	if contentType == "application/x-www-form-urlencoded" && actualBodyLen == 0 && queryParams != "" {
+		log.Printf("⚠️  Form-urlencoded with empty body but query params exist - body might be in query string")
+		body = []byte(queryParams)
+		actualBodyLen = len(body)
+		log.Printf("⚠️  Using query params as body: %d bytes", actualBodyLen)
+	}
+	log.Printf("==================")
 
 	// Handle compression if present
 	contentEncoding := r.Header.Get("Content-Encoding")

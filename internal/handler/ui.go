@@ -46,15 +46,30 @@ func (h *Handler) CreateEndpoint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
+	// Panic recovery
+	defer func() {
+		if rec := recover(); rec != nil {
+			log.Printf("PANIC in Dashboard handler: %v", rec)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+		}
+	}()
+
 	endpointID := chi.URLParam(r, "endpointID")
+	if endpointID == "" {
+		http.Error(w, "missing endpoint ID", http.StatusBadRequest)
+		return
+	}
+
 	endpoint, err := h.Store.GetEndpoint(r.Context(), endpointID)
 	if err != nil {
+		log.Printf("Error getting endpoint %s: %v", endpointID, err)
 		http.Error(w, "endpoint not found", http.StatusNotFound)
 		return
 	}
 
 	requests, err := h.Store.GetRequests(r.Context(), endpointID, 50)
 	if err != nil {
+		log.Printf("Error getting requests for endpoint %s: %v", endpointID, err)
 		http.Error(w, "failed to fetch requests", http.StatusInternalServerError)
 		return
 	}
@@ -80,7 +95,17 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	var firstRequest *requestDetailData
 	if len(requests) > 0 {
 		var headers map[string][]string
-		json.Unmarshal([]byte(requests[0].Headers), &headers)
+		// Initialize headers map to avoid nil pointer issues
+		headers = make(map[string][]string)
+
+		// Safely unmarshal headers JSON
+		if requests[0].Headers != "" {
+			if err := json.Unmarshal([]byte(requests[0].Headers), &headers); err != nil {
+				log.Printf("Warning: Failed to unmarshal headers for request %d: %v", requests[0].ID, err)
+				// Continue with empty headers map
+				headers = make(map[string][]string)
+			}
+		}
 
 		// Format headers as JSON for display
 		headersJSON, _ := json.MarshalIndent(headers, "", "  ")
@@ -141,6 +166,15 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Get host, with fallback
+	host := r.Host
+	if host == "" {
+		host = r.Header.Get("Host")
+	}
+	if host == "" {
+		host = "webhook.pipeops.app" // fallback
+	}
+
 	data := struct {
 		Endpoint       *store.Endpoint
 		Requests       []*store.Request
@@ -152,11 +186,13 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		Requests:       requests,
 		FirstRequest:   firstRequest,
 		OtherEndpoints: otherEndpoints,
-		Host:           r.Host,
+		Host:           host,
 	}
 
 	if err := dashboardTemplate.ExecuteTemplate(w, "layout", data); err != nil {
 		log.Printf("template execution error: %v", err)
+		log.Printf("Template data: Endpoint=%v, Requests=%d, FirstRequest=%v, Host=%s",
+			endpoint != nil, len(requests), firstRequest != nil, host)
 		http.Error(w, "failed to render page", http.StatusInternalServerError)
 		return
 	}
@@ -172,7 +208,17 @@ func (h *Handler) RequestDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var headers map[string][]string
-	json.Unmarshal([]byte(req.Headers), &headers)
+	// Initialize headers map to avoid nil pointer issues
+	headers = make(map[string][]string)
+
+	// Safely unmarshal headers JSON
+	if req.Headers != "" {
+		if err := json.Unmarshal([]byte(req.Headers), &headers); err != nil {
+			log.Printf("Warning: Failed to unmarshal headers for request %d: %v", req.ID, err)
+			// Continue with empty headers map
+			headers = make(map[string][]string)
+		}
+	}
 
 	// Format headers as JSON for display
 	headersJSON, _ := json.MarshalIndent(headers, "", "  ")
