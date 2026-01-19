@@ -133,6 +133,11 @@ func (s *SQLiteStore) GetRequest(ctx context.Context, id int64) (*Request, error
 	return &r, nil
 }
 
+func (s *SQLiteStore) DeleteRequest(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM requests WHERE id = ?", id)
+	return err
+}
+
 func (s *SQLiteStore) Cleanup(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM endpoints WHERE expires_at < ?", time.Now())
 	return err

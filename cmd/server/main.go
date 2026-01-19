@@ -41,7 +41,8 @@ func main() {
 	r.Post("/new", h.CreateEndpoint)
 	r.Get("/r/{requestID}", h.RequestDetail)
 	r.Post("/r/{requestID}/replay", h.ReplayRequest)
-	r.Get("/sse/{endpointID}", h.SSE)
+	r.Delete("/r/{requestID}", h.DeleteRequest)
+	r.Get("/ws/{endpointID}", h.WebSocket)
 	r.Get("/{endpointID}", h.Dashboard)
 
 	// Webhook receiver

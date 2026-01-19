@@ -32,6 +32,7 @@ type Store interface {
 	SaveRequest(ctx context.Context, req *Request) error
 	GetRequests(ctx context.Context, endpointID string, limit int) ([]*Request, error)
 	GetRequest(ctx context.Context, id int64) (*Request, error)
+	DeleteRequest(ctx context.Context, id int64) error
 
 	Cleanup(ctx context.Context) error
 }

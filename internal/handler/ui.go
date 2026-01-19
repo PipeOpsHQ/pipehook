@@ -100,3 +100,28 @@ func (h *Handler) RequestDetail(w http.ResponseWriter, r *http.Request) {
 
 	detailTemplate.ExecuteTemplate(w, "request-detail", data)
 }
+
+func (h *Handler) DeleteRequest(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "requestID")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid request ID", http.StatusBadRequest)
+		return
+	}
+
+	// Verify request exists
+	_, err = h.Store.GetRequest(r.Context(), id)
+	if err != nil {
+		http.Error(w, "request not found", http.StatusNotFound)
+		return
+	}
+
+	// Delete the request
+	if err := h.Store.DeleteRequest(r.Context(), id); err != nil {
+		http.Error(w, "failed to delete request", http.StatusInternalServerError)
+		return
+	}
+
+	// Return empty response for HTMX to handle removal
+	w.WriteHeader(http.StatusOK)
+}
