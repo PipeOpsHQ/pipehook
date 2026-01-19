@@ -29,6 +29,37 @@
                 }
             }
         }
+
+        function getRecentEndpoints() {
+            return JSON.parse(localStorage.getItem('pipehooks_recents') || '[]');
+        }
+
+        function saveEndpoint(id) {
+            let recents = getRecentEndpoints();
+            if (!recents.includes(id)) {
+                recents.unshift(id);
+                localStorage.setItem('pipehooks_recents', JSON.stringify(recents.slice(0, 10)));
+            }
+            updateHeaderRecents();
+        }
+
+        function updateHeaderRecents() {
+            const recents = getRecentEndpoints();
+            const container = document.getElementById('header-recents');
+            const list = document.getElementById('header-recents-list');
+
+            if (recents && container && list && recents.length > 0) {
+                container.classList.remove('hidden');
+                list.innerHTML = '';
+                recents.forEach(id => {
+                    const item = document.createElement('a');
+                    item.href = '/' + id;
+                    item.className = 'block px-4 py-2 text-[10px] font-mono text-slate-400 hover:text-white hover:bg-slate-800 truncate';
+                    item.innerText = id;
+                    list.appendChild(item);
+                });
+            }
+        }
     </script>
 </head>
 <body class="h-full antialiased bg-slate-950 flex flex-col">
@@ -62,37 +93,6 @@
     <div id="notifications" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
 
     <script>
-        function getRecentEndpoints() {
-            return JSON.parse(localStorage.getItem('pipehooks_recents') || '[]');
-        }
-
-        function saveEndpoint(id) {
-            let recents = getRecentEndpoints();
-            if (!recents.includes(id)) {
-                recents.unshift(id);
-                localStorage.setItem('pipehooks_recents', JSON.stringify(recents.slice(0, 10)));
-            }
-            updateHeaderRecents();
-        }
-
-        function updateHeaderRecents() {
-            const recents = getRecentEndpoints();
-            const container = document.getElementById('header-recents');
-            const list = document.getElementById('header-recents-list');
-
-            if (recents.length > 0) {
-                container.classList.remove('hidden');
-                list.innerHTML = '';
-                recents.forEach(id => {
-                    const item = document.createElement('a');
-                    item.href = '/' + id;
-                    item.className = 'block px-4 py-2 text-[10px] font-mono text-slate-400 hover:text-white hover:bg-slate-800 truncate';
-                    item.innerText = id;
-                    list.appendChild(item);
-                });
-            }
-        }
-
         window.addEventListener('DOMContentLoaded', updateHeaderRecents);
 
         document.body.addEventListener('requestReplayed', function(evt) {
