@@ -89,7 +89,7 @@
                         <!-- Line Numbers -->
                         <div id="line-numbers" class="bg-slate-900/80 text-slate-600 text-[11px] font-mono py-3 px-3 text-right select-none border-r border-slate-800/50 sticky left-0"></div>
                         <!-- Code Content -->
-                        <pre id="body-raw" class="flex-1 text-[11px] text-slate-200 font-mono py-3 px-4 m-0 leading-relaxed whitespace-pre overflow-x-auto">{{ if .Body }}{{ printf "%s" .Body }}{{ else }}<span class="text-slate-600 italic">Empty body</span>{{ end }}</pre>
+                        <pre id="body-raw" class="flex-1 text-[11px] font-mono py-3 px-4 m-0 leading-relaxed whitespace-pre overflow-x-auto">{{ if .Body }}{{ printf "%s" .Body }}{{ else }}<span class="text-slate-600 italic">Empty body</span>{{ end }}</pre>
                     </div>
                 </div>
             </div>
@@ -100,6 +100,41 @@
         (function() {
             const bodyRaw = document.getElementById('body-raw');
             const lineNumbers = document.getElementById('line-numbers');
+            let isJSON = false;
+
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            function highlightJSON(text) {
+                if (!isJSON) return escapeHtml(text);
+
+                // Escape HTML first
+                text = escapeHtml(text);
+
+                // Highlight JSON syntax
+                return text
+                    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function(match) {
+                        let cls = 'text-slate-200';
+                        if (/^"/.test(match)) {
+                            if (/:$/.test(match)) {
+                                cls = 'text-brand-400'; // key
+                            } else {
+                                cls = 'text-emerald-400'; // string value
+                            }
+                        } else if (/true|false/.test(match)) {
+                            cls = 'text-purple-400'; // boolean
+                        } else if (/null/.test(match)) {
+                            cls = 'text-slate-500'; // null
+                        } else {
+                            cls = 'text-blue-400'; // number
+                        }
+                        return '<span class="' + cls + '">' + match + '</span>';
+                    })
+                    .replace(/([{}[\],:])/g, '<span class="text-slate-400">$1</span>');
+            }
 
             function updateLineNumbers() {
                 const text = bodyRaw.innerText || bodyRaw.textContent || '';
@@ -107,19 +142,41 @@
                 lineNumbers.innerHTML = lines.map((_, i) => `<div class="leading-relaxed">${i + 1}</div>`).join('');
             }
 
-            function formatBody() {
-                const text = bodyRaw.innerText || bodyRaw.textContent || '';
+            function formatAndHighlight() {
+                const originalText = bodyRaw.textContent || bodyRaw.innerText || '';
+                if (!originalText.trim()) return;
+
                 try {
-                    const json = JSON.parse(text);
-                    bodyRaw.textContent = JSON.stringify(json, null, 2);
+                    const json = JSON.parse(originalText);
+                    const formatted = JSON.stringify(json, null, 2);
+                    bodyRaw.innerHTML = highlightJSON(formatted);
+                    isJSON = true;
                     updateLineNumbers();
                 } catch (e) {
-                    // Not JSON, do nothing
+                    // Not JSON, keep as is
+                    bodyRaw.textContent = originalText;
+                    isJSON = false;
+                    updateLineNumbers();
+                }
+            }
+
+            function formatBody() {
+                const text = bodyRaw.textContent || bodyRaw.innerText || '';
+                try {
+                    const json = JSON.parse(text);
+                    const formatted = JSON.stringify(json, null, 2);
+                    bodyRaw.innerHTML = highlightJSON(formatted);
+                    isJSON = true;
+                    updateLineNumbers();
+                } catch (e) {
+                    alert('Not valid JSON');
                 }
             }
 
             window.formatBody = formatBody;
-            updateLineNumbers();
+
+            // Auto-format on load
+            formatAndHighlight();
         })();
     </script>
     </div>
