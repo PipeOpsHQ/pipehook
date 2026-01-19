@@ -139,10 +139,8 @@
             };
 
             ws.onclose = function() {
-                // Attempt to reconnect after 3 seconds
-                setTimeout(function() {
-                    location.reload();
-                }, 3000);
+                // Connection closed - user can manually refresh if needed
+                console.log('WebSocket connection closed');
             };
         })();
     </script>
