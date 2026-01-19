@@ -12,5 +12,33 @@
             <i class="fas fa-arrow-right text-[10px]"></i>
         </button>
     </form>
+
+    <div id="recent-list-container" class="mt-12 w-full max-w-sm hidden">
+        <h2 class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 text-center">Recent Endpoints</h2>
+        <div id="recent-list" class="space-y-2"></div>
+    </div>
 </div>
+
+<script>
+    (function() {
+        const recents = getRecentEndpoints();
+        if (recents.length > 0) {
+            document.getElementById('recent-list-container').classList.remove('hidden');
+            const list = document.getElementById('recent-list');
+            recents.forEach(id => {
+                const item = document.createElement('a');
+                item.href = '/' + id;
+                item.className = 'flex items-center justify-between p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-brand-500/50 transition-all group';
+                item.innerHTML = `
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <i class="fas fa-link text-slate-600 text-[10px] group-hover:text-brand-500 transition-colors"></i>
+                        <span class="text-xs font-mono text-slate-300 truncate">${id}</span>
+                    </div>
+                    <i class="fas fa-chevron-right text-[8px] text-slate-700 group-hover:text-slate-400"></i>
+                `;
+                list.appendChild(item);
+            });
+        }
+    })();
+</script>
 {{ end }}
