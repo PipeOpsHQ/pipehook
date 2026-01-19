@@ -50,6 +50,18 @@
     <div id="notifications" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
 
     <script>
+        function getRecentEndpoints() {
+            return JSON.parse(localStorage.getItem('pipehooks_recents') || '[]');
+        }
+
+        function saveEndpoint(id) {
+            let recents = getRecentEndpoints();
+            if (!recents.includes(id)) {
+                recents.unshift(id);
+                localStorage.setItem('pipehooks_recents', JSON.stringify(recents.slice(0, 10)));
+            }
+        }
+
         document.body.addEventListener('requestReplayed', function(evt) {
             const notifications = document.getElementById('notifications');
             const toast = document.createElement('div');
