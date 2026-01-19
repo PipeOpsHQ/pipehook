@@ -14,7 +14,10 @@ import (
 )
 
 func main() {
-	dbPath := "webhook.db"
+	dbPath := os.Getenv("DATABASE_PATH")
+	if dbPath == "" {
+		dbPath = "webhook.db"
+	}
 	s, err := store.NewSQLiteStore(dbPath)
 	if err != nil {
 		log.Fatal(err)
