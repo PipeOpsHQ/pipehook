@@ -123,7 +123,8 @@
         </div>
     </div>
 
-    <script>
+    <div data-request-detail-script style="display: none;">
+        <script type="text/plain">
         (function() {
             function toggleSection(sectionId) {
                 const section = document.getElementById(sectionId);
@@ -387,7 +388,7 @@
                 formatAndHighlight();
             }
         })();
-    </script>
+        </script>
     </div>
 </div>
 {{ end }}

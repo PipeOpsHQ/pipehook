@@ -189,6 +189,24 @@
                             setTimeout(() => {
                                 self.isLoading = false;
                             }, 150);
+
+                            // Execute scripts from swapped content (extract from data attribute to avoid Vue compilation issues)
+                            const scriptContainer = e.detail.target.querySelector('[data-request-detail-script]');
+                            if (scriptContainer) {
+                                const scriptTag = scriptContainer.querySelector('script[type="text/plain"]');
+                                if (scriptTag) {
+                                    const scriptContent = scriptTag.textContent || scriptTag.innerText;
+                                    try {
+                                        // Create and execute script in global scope
+                                        const script = document.createElement('script');
+                                        script.textContent = scriptContent;
+                                        document.body.appendChild(script);
+                                        document.body.removeChild(script);
+                                    } catch (err) {
+                                        console.error('Error executing request detail script:', err);
+                                    }
+                                }
+                            }
                         }
                     });
                 },
