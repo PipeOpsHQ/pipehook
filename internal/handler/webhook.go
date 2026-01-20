@@ -41,6 +41,17 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Query params: %s", queryParams)
 	log.Printf("All headers: %+v", r.Header)
 
+	// Check if body has been consumed and attempt restoration
+	// Log body state before reading
+	log.Printf("=== BODY STATE CHECK ===")
+	log.Printf("Content-Length: %d", contentLength)
+	log.Printf("Body is nil: %v", r.Body == nil)
+	if r.GetBody != nil {
+		log.Printf("GetBody() is available: true")
+	} else {
+		log.Printf("GetBody() is available: false")
+	}
+
 	// Read body - even if Content-Length is 0, we should still try to read
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -55,22 +66,56 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Content-Length header: %d, Actual bytes read: %d", contentLength, actualBodyLen)
 	log.Printf("Transfer-Encoding: %s", transferEncoding)
 
+	// If body is empty but Content-Length indicates there should be data, try restoration
+	if actualBodyLen == 0 && contentLength > 0 && r.GetBody != nil {
+		log.Printf("⚠️  Body appears consumed (0 bytes read but Content-Length=%d). Attempting restoration via GetBody()...", contentLength)
+		restoredBody, restoreErr := r.GetBody()
+		if restoreErr == nil && restoredBody != nil {
+			restoredData, readErr := io.ReadAll(restoredBody)
+			restoredBody.Close()
+			if readErr == nil && len(restoredData) > 0 {
+				body = restoredData
+				actualBodyLen = len(body)
+				log.Printf("✅ Body restored successfully! Restored %d bytes (expected %d)", actualBodyLen, contentLength)
+			} else if readErr != nil {
+				log.Printf("⚠️  Failed to read from restored body: %v", readErr)
+			} else {
+				log.Printf("⚠️  Restored body is also empty")
+			}
+		} else {
+			log.Printf("⚠️  Failed to get restored body: %v", restoreErr)
+		}
+	}
+
 	if actualBodyLen > 0 {
 		previewLen := actualBodyLen
 		if previewLen > 500 {
 			previewLen = 500
 		}
+		log.Printf("✅ Body captured successfully: %d bytes", actualBodyLen)
 		log.Printf("Body preview (first %d bytes): %q", previewLen, string(body[:previewLen]))
+		if contentLength > 0 && int64(actualBodyLen) != contentLength {
+			log.Printf("⚠️  NOTE: Body length mismatch - Content-Length=%d, Actual=%d (difference: %d bytes)",
+				contentLength, actualBodyLen, contentLength-int64(actualBodyLen))
+		}
 	} else if contentLength > 0 {
 		// Content-Length says there should be a body, but we got nothing
-		log.Printf("⚠️  WARNING: Content-Length=%d but captured 0 bytes! Body may have been consumed by middleware or proxy.", contentLength)
-		log.Printf("⚠️  This suggests a proxy/load balancer may be stripping the body before it reaches the application.")
+		log.Printf("❌ CRITICAL: Content-Length=%d but captured 0 bytes!", contentLength)
+		log.Printf("⚠️  Possible causes:")
+		log.Printf("   - Body consumed by middleware/proxy before handler")
+		log.Printf("   - Body consumed by previous handler/middleware")
+		log.Printf("   - Proxy/load balancer stripping body")
+		log.Printf("   - Request body stream already closed")
+		if r.GetBody == nil {
+			log.Printf("   - GetBody() not available (cannot restore)")
+		}
 	} else if transferEncoding == "chunked" {
 		// Chunked encoding might not have Content-Length
-		log.Printf("Transfer-Encoding is chunked but body is empty - this is unusual")
+		log.Printf("⚠️  Transfer-Encoding is chunked but body is empty - this is unusual")
+		log.Printf("   Chunked encoding should have body data even without Content-Length header")
 	} else {
 		// Content-Length is 0, so empty body is expected
-		log.Printf("Empty body (Content-Length=0, this is expected)")
+		log.Printf("ℹ️  Empty body (Content-Length=0, this is expected)")
 	}
 
 	// Check if body might be in query parameters (some proxies do this)
@@ -85,6 +130,15 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 		body = []byte(queryParams)
 		actualBodyLen = len(body)
 		log.Printf("⚠️  Using query params as body: %d bytes", actualBodyLen)
+	}
+
+	// Final body state summary
+	log.Printf("=== FINAL BODY STATE ===")
+	log.Printf("Content-Length header: %d", contentLength)
+	log.Printf("Actual body length: %d bytes", actualBodyLen)
+	log.Printf("Content-Type: %s", contentType)
+	if actualBodyLen == 0 && contentLength > 0 {
+		log.Printf("❌ BODY CAPTURE FAILED - Expected %d bytes but got 0", contentLength)
 	}
 	log.Printf("==================")
 
@@ -139,6 +193,23 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error saving request: %v", err)
 		http.Error(w, "failed to save request", http.StatusInternalServerError)
 		return
+	}
+
+	// Verify body was stored correctly by reading it back
+	if req.ID > 0 {
+		verifyReq, verifyErr := h.Store.GetRequest(r.Context(), req.ID)
+		if verifyErr == nil && verifyReq != nil {
+			storedBodyLen := len(verifyReq.Body)
+			expectedBodyLen := len(bodyToStore)
+			if storedBodyLen != expectedBodyLen {
+				log.Printf("❌ DATABASE VERIFICATION FAILED: Expected %d bytes, stored %d bytes (difference: %d)",
+					expectedBodyLen, storedBodyLen, expectedBodyLen-storedBodyLen)
+			} else {
+				log.Printf("✅ Database verification passed: %d bytes stored correctly", storedBodyLen)
+			}
+		} else {
+			log.Printf("⚠️  Could not verify stored body: %v", verifyErr)
+		}
 	}
 
 	h.Broadcast(endpointID, req)
