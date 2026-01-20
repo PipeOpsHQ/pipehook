@@ -328,7 +328,13 @@
             });
 
             if (typeof saveEndpoint === 'function') {
-                saveEndpoint('{{ .Endpoint.ID }}');
+                const endpointIdElement = document.getElementById('endpoint-header');
+                if(endpointIdElement) {
+                    const endpointId = endpointIdElement.getAttribute('data-endpoint-id');
+                    if(endpointId) {
+                        saveEndpoint(endpointId);
+                    }
+                }
             }
 
             // WebSocket connection for real-time updates
