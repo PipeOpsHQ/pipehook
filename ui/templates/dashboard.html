@@ -18,7 +18,7 @@
     <!-- Details Area -->
     <div class="flex-1 flex flex-col min-w-0 bg-slate-950">
         <!-- Endpoint Header -->
-        <div class="p-4 border-b border-slate-800 flex items-center justify-between gap-4 bg-slate-900/20">
+        <div id="endpoint-header" class="p-4 border-b border-slate-800 flex items-center justify-between gap-4 bg-slate-900/20" data-endpoint-id="{{ if .Endpoint }}{{ .Endpoint.ID }}{{ end }}">
             <div class="flex items-center gap-4 min-w-0 flex-1">
                 <a href="/" class="text-xs text-slate-500 hover:text-brand-400 transition-colors flex items-center gap-1.5 shrink-0" title="View all endpoints">
                     <i class="fas fa-arrow-left text-[10px]"></i>
@@ -27,7 +27,10 @@
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                     <span class="text-xs text-slate-500 font-semibold whitespace-nowrap uppercase tracking-wider shrink-0">URL</span>
                     {{ if .Endpoint }}
-                    <code class="bg-slate-900 border border-slate-800 text-brand-400 px-3 py-1 rounded text-sm font-mono truncate select-all shadow-inner flex-1 min-w-0">https://{{ .Host }}/h/{{ .Endpoint.ID }}</code>
+                    <div class="flex items-center gap-2 min-w-0 flex-1">
+                        <div id="endpoint-color-dot" class="w-2 h-2 rounded-full shrink-0 bg-brand-500"></div>
+                        <code id="endpoint-url" class="bg-slate-900 border border-slate-800 text-brand-400 px-3 py-1 rounded text-sm font-mono truncate select-all shadow-inner flex-1 min-w-0">https://{{ .Host }}/h/{{ .Endpoint.ID }}</code>
+                    </div>
                     <button onclick="navigator.clipboard.writeText('https://{{ .Host }}/h/{{ .Endpoint.ID }}')" class="text-slate-500 hover:text-white transition-colors p-1.5 hover:bg-slate-800 rounded-md shrink-0">
                         <i class="fas fa-copy text-xs"></i>
                     </button>
@@ -47,8 +50,9 @@
                     <transition name="dropdown">
                         <div v-if="switchDropdownOpen" class="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-lg shadow-xl py-1 z-50">
                         {{ range .OtherEndpoints }}
-                        <a href="/{{ .ID }}" class="block px-4 py-2 text-[10px] font-mono text-slate-400 hover:text-white hover:bg-slate-800 truncate">
-                            {{ .ID }}
+                        <a href="/{{ .ID }}" class="block px-4 py-2 text-[10px] font-mono text-slate-400 hover:text-white hover:bg-slate-800 truncate flex items-center gap-2 border-l-4 switch-endpoint-item" data-endpoint-id="{{ .ID }}">
+                            <div class="w-1.5 h-1.5 rounded-full shrink-0 switch-endpoint-dot" data-endpoint-id="{{ .ID }}"></div>
+                            <span class="truncate">{{ .ID }}</span>
                         </a>
                         {{ end }}
                         <div class="border-t border-slate-800 mt-1 pt-1">
@@ -117,8 +121,32 @@
                     return {
                         isLoading: false,
                         selectedRequestId: null,
-                        switchDropdownOpen: false
+                        switchDropdownOpen: false,
+                        endpointColor: null
                     }
+                },
+                mounted() {
+                    // Set endpoint color on mount and apply to header
+                    {{ if .Endpoint }}
+                    this.endpointColor = getEndpointColor('{{ .Endpoint.ID }}');
+                    if (this.endpointColor) {
+                        const header = document.getElementById('endpoint-header');
+                        const dot = document.getElementById('endpoint-color-dot');
+                        const url = document.getElementById('endpoint-url');
+                        if (header) {
+                            header.classList.add('border-l-4', this.endpointColor.border);
+                            header.classList.remove('border-slate-800');
+                        }
+                        if (dot) {
+                            dot.classList.remove('bg-brand-500');
+                            dot.classList.add(this.endpointColor.accent);
+                        }
+                        if (url) {
+                            url.classList.remove('text-brand-400');
+                            url.classList.add(this.endpointColor.text);
+                        }
+                    }
+                    {{ end }}
                 },
                 methods: {
                     handleRequestClick(requestId) {
@@ -171,6 +199,39 @@
 
             // Mount Vue app
             dashboardApp.mount('#dashboard-vue-app');
+
+            // Apply colors to request items and dropdown after Vue is mounted
+            function applyEndpointColors() {
+                document.querySelectorAll('[data-endpoint-id]').forEach(el => {
+                    const endpointId = el.getAttribute('data-endpoint-id');
+                    if (endpointId) {
+                        const color = getEndpointColor(endpointId);
+                        if (color) {
+                            // Apply border color to list item
+                            if (el.tagName === 'LI') {
+                                el.classList.add(color.border);
+                            }
+                            // Apply border color to dropdown items
+                            if (el.classList.contains('switch-endpoint-item')) {
+                                el.classList.add(color.border);
+                            }
+                            // Apply dot color
+                            const dot = el.querySelector('.endpoint-color-dot[data-endpoint-id="' + endpointId + '"]') ||
+                                       el.querySelector('.switch-endpoint-dot[data-endpoint-id="' + endpointId + '"]');
+                            if (dot) {
+                                dot.classList.add(color.accent);
+                            }
+                        }
+                    }
+                });
+            }
+
+            setTimeout(applyEndpointColors, 100);
+
+            // Re-apply colors when dropdown opens (for dynamically added items)
+            document.body.addEventListener('htmx:afterSwap', function() {
+                setTimeout(applyEndpointColors, 50);
+            });
 
             if (typeof saveEndpoint === 'function') {
                 saveEndpoint('{{ .Endpoint.ID }}');
@@ -226,8 +287,11 @@
 {{ end }}
 
 {{ define "request-item" }}
-<li class="group hover:bg-slate-800/40 cursor-pointer transition-all relative border-l-4 border-transparent active:bg-slate-800/60" data-request-id="{{ .ID }}"
-    onclick="document.querySelectorAll('#request-list li').forEach(el => el.classList.remove('bg-slate-800/50', 'border-brand-500', 'shadow-inner')); this.classList.add('bg-slate-800/50', 'border-brand-500', 'shadow-inner')">
+<li class="group hover:bg-slate-800/40 cursor-pointer transition-all relative border-l-4 active:bg-slate-800/60"
+    data-request-id="{{ .ID }}"
+    data-endpoint-id="{{ .EndpointID }}"
+    data-endpoint-color-border=""
+    onclick="document.querySelectorAll('#request-list li').forEach(el => el.classList.remove('bg-slate-800/50', 'shadow-inner')); this.classList.add('bg-slate-800/50', 'shadow-inner'); const color = getEndpointColor('{{ .EndpointID }}'); if(color && this.dataset.endpointColorBorder === '') { this.classList.add(color.border); this.dataset.endpointColorBorder = color.border; }">
     <div class="px-4 py-4 flex items-start justify-between gap-3">
         <div class="flex-1 min-w-0 cursor-pointer"
              hx-get="/r/{{ .ID }}"
@@ -235,7 +299,10 @@
              hx-swap="innerHTML"
              @click="handleRequestClick({{ .ID }})">
             <div class="flex items-center justify-between mb-2">
-                <span class="text-xs font-bold {{ if eq .Method "GET" }}text-emerald-500 bg-emerald-500/10 border-emerald-500/20{{ else }}text-brand-400 bg-brand-500/10 border-brand-500/20{{ end }} font-mono px-2 py-0.5 rounded border">{{ .Method }}</span>
+                <div class="flex items-center gap-1.5">
+                    <div class="endpoint-color-dot w-1.5 h-1.5 rounded-full shrink-0" data-endpoint-id="{{ .EndpointID }}"></div>
+                    <span class="text-xs font-bold {{ if eq .Method "GET" }}text-emerald-500 bg-emerald-500/10 border-emerald-500/20{{ else }}text-brand-400 bg-brand-500/10 border-brand-500/20{{ end }} font-mono px-2 py-0.5 rounded border">{{ .Method }}</span>
+                </div>
                 <span class="text-[10px] text-slate-500 font-mono tracking-tighter" data-timestamp="{{ .CreatedAt.Format "2006-01-02T15:04:05Z07:00" }}">{{ .CreatedAt.Format "15:04:05" }}</span>
             </div>
             <p class="text-sm text-slate-300 font-mono truncate group-hover:text-white transition-colors">{{ .Path }}</p>

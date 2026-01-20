@@ -20,14 +20,14 @@
         <h2 class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mb-4">Your Endpoints</h2>
         <div class="space-y-2">
             {{ range .Endpoints }}
-            <a href="/{{ .ID }}" class="flex items-center justify-between p-4 rounded-lg bg-slate-900 border border-slate-800 hover:border-brand-500/50 transition-all group">
+            <a href="/{{ .ID }}" class="flex items-center justify-between p-4 rounded-lg bg-slate-900 border border-l-4 transition-all group home-endpoint-item" data-endpoint-id="{{ .ID }}">
                 <div class="flex items-center gap-4 flex-1 min-w-0">
-                    <div class="w-10 h-10 bg-brand-500/10 rounded-lg flex items-center justify-center border border-brand-500/20 shrink-0">
-                        <i class="fas fa-link text-brand-500 text-xs"></i>
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 home-endpoint-icon" data-endpoint-id="{{ .ID }}">
+                        <div class="w-2 h-2 rounded-full home-endpoint-dot" data-endpoint-id="{{ .ID }}"></div>
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 mb-1">
-                            <span class="text-sm font-mono text-slate-200 truncate">{{ .ID }}</span>
+                            <span class="text-sm font-mono truncate home-endpoint-text" data-endpoint-id="{{ .ID }}">{{ .ID }}</span>
                             {{ if .Alias }}
                             <span class="text-xs text-slate-500">({{ .Alias }})</span>
                             {{ end }}
@@ -54,4 +54,31 @@
     </div>
     {{ end }}
 </div>
+
+<script>
+    // Apply endpoint colors on home page
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.home-endpoint-item').forEach(item => {
+            const endpointId = item.getAttribute('data-endpoint-id');
+            if (endpointId && typeof getEndpointColor === 'function') {
+                const color = getEndpointColor(endpointId);
+                if (color) {
+                    item.classList.add(color.border);
+                    const dot = item.querySelector('.home-endpoint-dot[data-endpoint-id="' + endpointId + '"]');
+                    const icon = item.querySelector('.home-endpoint-icon[data-endpoint-id="' + endpointId + '"]');
+                    const text = item.querySelector('.home-endpoint-text[data-endpoint-id="' + endpointId + '"]');
+                    if (dot) {
+                        dot.classList.add(color.accent);
+                    }
+                    if (icon) {
+                        icon.classList.add(color.bg, 'border', color.border);
+                    }
+                    if (text) {
+                        text.classList.add(color.text);
+                    }
+                }
+            }
+        });
+    });
+</script>
 {{ end }}
