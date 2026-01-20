@@ -1,5 +1,5 @@
 {{ define "content" }}
-<div id="dashboard-vue-app" class="h-full flex overflow-hidden">
+<div class="h-full flex overflow-hidden">
     <!-- Compact Request List -->
     <div class="w-80 lg:w-96 border-r border-slate-800 bg-slate-900/30 flex flex-col shrink-0">
         <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
@@ -42,13 +42,12 @@
             <div class="flex items-center gap-3 whitespace-nowrap">
                 {{ if .OtherEndpoints }}
                 <div class="relative" id="switch-container">
-                    <button v-on:click="toggleSwitchDropdown" class="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
+                    <button id="switch-btn" onclick="toggleSwitchDropdown()" class="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
                         <i class="fas fa-exchange-alt text-[10px]"></i>
                         Switch
-                        <i class="fas fa-chevron-down text-[8px]" v-bind:class="getChevronClass()"></i>
+                        <i id="switch-chevron" class="fas fa-chevron-down text-[8px] transition-transform duration-200"></i>
                     </button>
-                    <transition name="dropdown">
-                        <div v-if="switchDropdownOpen" class="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-lg shadow-xl py-1 z-50">
+                    <div id="switch-dropdown" class="hidden absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-lg shadow-xl py-1 z-50">
                         {{ range .OtherEndpoints }}
                         <a href="/{{ .ID }}" class="block px-4 py-2 text-[10px] font-mono text-slate-400 hover:text-white hover:bg-slate-800 truncate flex items-center gap-2 border-l-4 switch-endpoint-item" data-endpoint-id="{{ .ID }}">
                             <div class="w-1.5 h-1.5 rounded-full shrink-0 switch-endpoint-dot" data-endpoint-id="{{ .ID }}"></div>
@@ -60,8 +59,7 @@
                                 <i class="fas fa-plus text-[8px] mr-2"></i>Create New
                             </a>
                         </div>
-                        </div>
-                    </transition>
+                    </div>
                 </div>
                 {{ end }}
                 <span class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -113,7 +111,7 @@
 
     <script>
         (function() {
-            // Loading overlay helpers (plain DOM, not Vue)
+            // Loading overlay helpers
             function showLoadingOverlay() {
                 var overlay = document.getElementById("loading-overlay");
                 var content = document.getElementById("request-detail-content");
@@ -139,92 +137,93 @@
             window.showLoadingOverlay = showLoadingOverlay;
             window.hideLoadingOverlay = hideLoadingOverlay;
 
-            const { createApp } = Vue;
-
-            // Vue app for dashboard interactions (minimal - just for dropdown)
-            const dashboardApp = createApp({
-                data() {
-                    return {
-                        switchDropdownOpen: false,
-                        endpointColor: null
+            // Switch dropdown toggle (plain JavaScript)
+            var switchDropdownOpen = false;
+            function toggleSwitchDropdown() {
+                var dropdown = document.getElementById("switch-dropdown");
+                var chevron = document.getElementById("switch-chevron");
+                switchDropdownOpen = !switchDropdownOpen;
+                if (dropdown) {
+                    if (switchDropdownOpen) {
+                        dropdown.classList.remove("hidden");
+                    } else {
+                        dropdown.classList.add("hidden");
                     }
-                },
-                mounted() {
-                    // Set endpoint color on mount and apply to header
-                    {{ if .Endpoint }}
-                    var endpointIdElement = document.getElementById("endpoint-header");
-                    if(endpointIdElement && typeof getEndpointColor === "function") {
-                        var endpointId = endpointIdElement.getAttribute("data-endpoint-id");
-                        if(endpointId) {
-                            this.endpointColor = getEndpointColor(endpointId);
-                            if (this.endpointColor) {
-                                var header = document.getElementById("endpoint-header");
-                                var dot = document.getElementById("endpoint-color-dot");
-                                var url = document.getElementById("endpoint-url");
-                                if (header) {
-                                    header.classList.add("border-l-4", this.endpointColor.border);
-                                    header.classList.remove("border-slate-800");
-                                }
-                                if (dot) {
-                                    dot.classList.remove("bg-brand-500");
-                                    dot.classList.add(this.endpointColor.accent);
-                                }
-                                if (url) {
-                                    url.classList.remove("text-brand-400");
-                                    url.classList.add(this.endpointColor.text);
-                                }
-                            }
-                        }
-                    }
-                    {{ end }}
-                },
-                methods: {
-                    toggleSwitchDropdown() {
-                        this.switchDropdownOpen = !this.switchDropdownOpen;
-                    },
-                    getChevronClass() {
-                        return this.switchDropdownOpen ? "rotate-180" : "";
-                    },
-                    closeSwitchDropdown(event) {
-                        var container = document.getElementById("switch-container");
-                        if (container && !container.contains(event.target)) {
-                            this.switchDropdownOpen = false;
-                        }
-                    }
-                },
-                mounted() {
-                    // Close dropdown when clicking outside
-                    document.addEventListener("click", this.closeSwitchDropdown);
-
-                    // Handle HTMX events for smooth transitions (using plain DOM, not Vue state)
-                    document.body.addEventListener("htmx:beforeRequest", function(e) {
-                        if (e.detail.target && e.detail.target.id === "request-detail-content") {
-                            showLoadingOverlay();
-                        }
-                    });
-
-                    document.body.addEventListener("htmx:afterSwap", function(e) {
-                        if (e.detail.target && e.detail.target.id === "request-detail-content") {
-                            hideLoadingOverlay();
-                            // Initialize request detail (format JSON, update line numbers)
-                            if (typeof initRequestDetail === "function") {
-                                initRequestDetail();
-                            }
-                        }
-                    });
-
-                    // Reset loading state on HTMX errors
-                    document.body.addEventListener("htmx:responseError", function(e) {
-                        hideLoadingOverlay();
-                    });
-
-                    document.body.addEventListener("htmx:sendError", function(e) {
-                        hideLoadingOverlay();
-                    });
-                },
-                beforeUnmount() {
-                    document.removeEventListener("click", this.closeSwitchDropdown);
                 }
+                if (chevron) {
+                    if (switchDropdownOpen) {
+                        chevron.classList.add("rotate-180");
+                    } else {
+                        chevron.classList.remove("rotate-180");
+                    }
+                }
+            }
+            window.toggleSwitchDropdown = toggleSwitchDropdown;
+
+            // Close dropdown when clicking outside
+            document.addEventListener("click", function(event) {
+                var container = document.getElementById("switch-container");
+                if (container && !container.contains(event.target) && switchDropdownOpen) {
+                    switchDropdownOpen = false;
+                    var dropdown = document.getElementById("switch-dropdown");
+                    var chevron = document.getElementById("switch-chevron");
+                    if (dropdown) dropdown.classList.add("hidden");
+                    if (chevron) chevron.classList.remove("rotate-180");
+                }
+            });
+
+            // Set endpoint color on load
+            {{ if .Endpoint }}
+            (function() {
+                var endpointIdElement = document.getElementById("endpoint-header");
+                if(endpointIdElement && typeof getEndpointColor === "function") {
+                    var endpointId = endpointIdElement.getAttribute("data-endpoint-id");
+                    if(endpointId) {
+                        var endpointColor = getEndpointColor(endpointId);
+                        if (endpointColor) {
+                            var header = document.getElementById("endpoint-header");
+                            var dot = document.getElementById("endpoint-color-dot");
+                            var url = document.getElementById("endpoint-url");
+                            if (header) {
+                                header.classList.add("border-l-4", endpointColor.border);
+                                header.classList.remove("border-slate-800");
+                            }
+                            if (dot) {
+                                dot.classList.remove("bg-brand-500");
+                                dot.classList.add(endpointColor.accent);
+                            }
+                            if (url) {
+                                url.classList.remove("text-brand-400");
+                                url.classList.add(endpointColor.text);
+                            }
+                        }
+                    }
+                }
+            })();
+            {{ end }}
+
+            // Handle HTMX events for smooth transitions
+            document.body.addEventListener("htmx:beforeRequest", function(e) {
+                if (e.detail.target && e.detail.target.id === "request-detail-content") {
+                    showLoadingOverlay();
+                }
+            });
+
+            document.body.addEventListener("htmx:afterSwap", function(e) {
+                if (e.detail.target && e.detail.target.id === "request-detail-content") {
+                    hideLoadingOverlay();
+                    if (typeof initRequestDetail === "function") {
+                        initRequestDetail();
+                    }
+                }
+            });
+
+            document.body.addEventListener("htmx:responseError", function(e) {
+                hideLoadingOverlay();
+            });
+
+            document.body.addEventListener("htmx:sendError", function(e) {
+                hideLoadingOverlay();
             });
 
             // Copy endpoint URL function
@@ -259,9 +258,6 @@
                 }
             }
             window.handleDeleteEndpoint = handleDeleteEndpoint;
-
-            // Mount Vue app
-            dashboardApp.mount("#dashboard-vue-app");
 
             // Handle request item click
             function handleRequestItemClick(element) {
