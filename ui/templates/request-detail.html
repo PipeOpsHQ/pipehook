@@ -8,9 +8,10 @@
         </div>
         <div class="flex items-center gap-1.5">
             <button class="text-[10px] font-bold text-white bg-brand-600 hover:bg-brand-500 px-2.5 py-1 rounded-md transition-all active:scale-95 flex items-center gap-1.5 shadow-lg shadow-brand-600/5"
-                    hx-post="/r/{{ .ID }}/replay"
+                    data-request-id="{{ .ID }}"
+                    hx-post=""
                     hx-swap="none"
-                    hx-on::before-request="handleReplayBefore(this)"
+                    hx-on::before-request="setReplayUrl(this); handleReplayBefore(this)"
                     hx-on::after-request="handleReplayAfter(this)">
                 <i class="fas fa-repeat text-[9px]"></i>
                 Replay
@@ -115,6 +116,14 @@
     <div data-request-detail-script style="display: none;">
         <script type="text/plain">
         (function() {
+            function setReplayUrl(button) {
+                const requestId = button ? button.getAttribute('data-request-id') : null;
+                if(requestId) {
+                    button.setAttribute('hx-post', '/r/' + requestId + '/replay');
+                }
+            }
+            window.setReplayUrl = setReplayUrl;
+
             function handleReplayBefore(button) {
                 if(button) {
                     button.classList.add('opacity-50', 'pointer-events-none');
