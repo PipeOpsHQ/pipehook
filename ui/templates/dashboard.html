@@ -128,8 +128,12 @@
                 mounted() {
                     // Set endpoint color on mount and apply to header
                     {{ if .Endpoint }}
-                    this.endpointColor = getEndpointColor('{{ .Endpoint.ID }}');
-                    if (this.endpointColor) {
+                    const endpointIdElement = document.getElementById('endpoint-header');
+                    if(endpointIdElement && typeof getEndpointColor === 'function') {
+                        const endpointId = endpointIdElement.getAttribute('data-endpoint-id');
+                        if(endpointId) {
+                            this.endpointColor = getEndpointColor(endpointId);
+                            if (this.endpointColor) {
                         const header = document.getElementById('endpoint-header');
                         const dot = document.getElementById('endpoint-color-dot');
                         const url = document.getElementById('endpoint-url');
@@ -146,12 +150,16 @@
                             url.classList.add(this.endpointColor.text);
                         }
                     }
+                    }
                     {{ end }}
                 },
                 methods: {
-                    handleRequestClick(requestId) {
-                        this.selectedRequestId = requestId;
-                        this.isLoading = true;
+                    handleRequestClick(element) {
+                        const requestId = element ? element.getAttribute('data-request-id') : null;
+                        if(requestId) {
+                            this.selectedRequestId = parseInt(requestId);
+                            this.isLoading = true;
+                        }
                     },
                     handleRequestLoaded() {
                         this.isLoading = false;
@@ -383,7 +391,8 @@
              hx-get="/r/{{ .ID }}"
              hx-target="#request-detail-content"
              hx-swap="innerHTML"
-             @click="handleRequestClick({{ .ID }})">
+             data-request-id="{{ .ID }}"
+             onclick="handleRequestClick(this)">
             <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-1.5">
                     <div class="endpoint-color-dot w-1.5 h-1.5 rounded-full shrink-0" data-endpoint-id="{{ .EndpointID }}"></div>
