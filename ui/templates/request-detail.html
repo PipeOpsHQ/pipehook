@@ -154,6 +154,13 @@
                 return div.innerHTML;
             }
 
+            // Get raw text content from HTML-escaped content
+            function getRawText(element) {
+                if (!element) return '';
+                // textContent automatically decodes HTML entities
+                return element.textContent || element.innerText || '';
+            }
+
             function highlightJSON(text) {
                 if (!isJSON) return escapeHtml(text);
 
@@ -229,7 +236,9 @@
 
             function formatAndHighlight() {
                 if (!bodyRaw) return;
-                const originalText = bodyRaw.textContent || bodyRaw.innerText || '';
+                // Get raw text - textContent automatically decodes HTML entities
+                const originalText = getRawText(bodyRaw);
+
                 if (!originalText.trim()) {
                     updateLineNumbers();
                     return;
@@ -239,13 +248,18 @@
 
                 if (detectedType === 'json') {
                     try {
+                        // Parse and format JSON with proper indentation (2 spaces)
                         const json = JSON.parse(originalText);
                         const formatted = JSON.stringify(json, null, 2);
                         bodyRaw.innerHTML = highlightJSON(formatted);
                         isJSON = true;
                         updateLineNumbers();
                         return;
-                    } catch (e) {}
+                    } catch (e) {
+                        // If JSON parsing fails, still try to display with syntax highlighting
+                        // in case it's malformed JSON
+                        console.log('JSON parse error:', e);
+                    }
                 }
 
                 // Not JSON or failed to parse, display as-is
@@ -258,13 +272,15 @@
 
             function formatBody() {
                 if (!bodyRaw) return;
-                const text = bodyRaw.textContent || bodyRaw.innerText || '';
+                // Get raw text - textContent automatically decodes HTML entities
+                const text = getRawText(bodyRaw);
                 if (!text.trim()) return;
 
                 const detectedType = detectContentType(text, contentType);
 
                 if (detectedType === 'json') {
                     try {
+                        // Parse and format JSON with proper indentation (2 spaces)
                         const json = JSON.parse(text);
                         const formatted = JSON.stringify(json, null, 2);
                         bodyRaw.innerHTML = highlightJSON(formatted);
@@ -275,7 +291,7 @@
                         }
                     } catch (e) {
                         if (typeof showToast === 'function') {
-                            showToast('Not valid JSON', 'error');
+                            showToast('Not valid JSON: ' + e.message, 'error');
                         }
                     }
                 } else if (detectedType === 'xml') {

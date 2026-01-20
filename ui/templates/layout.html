@@ -18,6 +18,13 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #334155; }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .fade-in {
+            animation: fadeIn 0.2s ease-in-out;
+        }
     </style>
     <script>
         tailwind.config = {
