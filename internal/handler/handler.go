@@ -11,10 +11,16 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// Template functions
+var funcMap = template.FuncMap{
+	"sub": func(a, b int) int { return a - b },
+	"add": func(a, b int) int { return a + b },
+}
+
 var (
-	homeTemplate      = template.Must(template.ParseFS(ui.FS, "templates/layout.html", "templates/home.html"))
-	dashboardTemplate = template.Must(template.ParseFS(ui.FS, "templates/layout.html", "templates/dashboard.html", "templates/request-detail.html"))
-	detailTemplate    = template.Must(template.ParseFS(ui.FS, "templates/request-detail.html"))
+	homeTemplate      = template.Must(template.New("").Funcs(funcMap).ParseFS(ui.FS, "templates/layout.html", "templates/home.html"))
+	dashboardTemplate = template.Must(template.New("").Funcs(funcMap).ParseFS(ui.FS, "templates/layout.html", "templates/dashboard.html", "templates/request-detail.html"))
+	detailTemplate    = template.Must(template.New("").Funcs(funcMap).ParseFS(ui.FS, "templates/request-detail.html"))
 
 	upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,

@@ -165,6 +165,37 @@ func (s *SQLiteStore) GetRequests(ctx context.Context, endpointID string, limit 
 	return reqs, nil
 }
 
+func (s *SQLiteStore) GetRequestsWithOffset(ctx context.Context, endpointID string, limit int, offset int) ([]*Request, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, endpoint_id, method, path, remote_addr, headers, body, status_code, created_at
+		FROM requests
+		WHERE endpoint_id = ?
+		ORDER BY created_at DESC
+		LIMIT ? OFFSET ?
+	`, endpointID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reqs []*Request
+	for rows.Next() {
+		var r Request
+		err := rows.Scan(&r.ID, &r.EndpointID, &r.Method, &r.Path, &r.RemoteAddr, &r.Headers, &r.Body, &r.StatusCode, &r.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		reqs = append(reqs, &r)
+	}
+	return reqs, nil
+}
+
+func (s *SQLiteStore) CountRequests(ctx context.Context, endpointID string) (int, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM requests WHERE endpoint_id = ?`, endpointID).Scan(&count)
+	return count, err
+}
+
 func (s *SQLiteStore) GetRequest(ctx context.Context, id int64) (*Request, error) {
 	var r Request
 	err := s.db.QueryRowContext(ctx, `

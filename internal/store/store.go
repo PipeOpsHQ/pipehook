@@ -32,6 +32,8 @@ type Store interface {
 
 	SaveRequest(ctx context.Context, req *Request) error
 	GetRequests(ctx context.Context, endpointID string, limit int) ([]*Request, error)
+	GetRequestsWithOffset(ctx context.Context, endpointID string, limit int, offset int) ([]*Request, error)
+	CountRequests(ctx context.Context, endpointID string) (int, error)
 	GetRequest(ctx context.Context, id int64) (*Request, error)
 	DeleteRequest(ctx context.Context, id int64) error
 

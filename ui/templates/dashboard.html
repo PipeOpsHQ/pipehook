@@ -5,12 +5,22 @@
         <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
             <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">History</span>
             <span id="request-count" class="text-xs font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700/50">
-                {{ len .Requests }}
+                {{ .TotalCount }}
             </span>
         </div>
         <ul id="request-list" class="flex-1 overflow-y-auto custom-scrollbar divide-y divide-slate-800/50">
             {{ range .Requests }}
                 {{ template "request-item" . }}
+            {{ end }}
+            {{ if .HasMore }}
+            <li id="load-more-container" class="p-4 text-center">
+                <button hx-get="/{{ .Endpoint.ID }}/more?offset={{ len .Requests }}&limit={{ .Limit }}"
+                        hx-target="#load-more-container"
+                        hx-swap="outerHTML"
+                        class="text-xs font-bold text-brand-400 hover:text-brand-300 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition-all">
+                    <i class="fas fa-chevron-down mr-2"></i>Load More ({{ if gt (sub .TotalCount (len .Requests)) 0 }}{{ sub .TotalCount (len .Requests) }}{{ else }}0{{ end }} remaining)
+                </button>
+            </li>
             {{ end }}
         </ul>
     </div>
@@ -562,16 +572,6 @@
             document.body.addEventListener("htmx:afterSwap", function() {
                 setTimeout(applyEndpointColors, 50);
             });
-
-            if (typeof saveEndpoint === "function") {
-                const endpointIdElement = document.getElementById("endpoint-header");
-                if(endpointIdElement) {
-                    const endpointId = endpointIdElement.getAttribute("data-endpoint-id");
-                    if(endpointId) {
-                        saveEndpoint(endpointId);
-                    }
-                }
-            }
 
             // WebSocket connection for real-time updates
             const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";

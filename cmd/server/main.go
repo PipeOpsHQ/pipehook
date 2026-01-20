@@ -120,6 +120,7 @@ func main() {
 	r.Delete("/r/{requestID}", h.DeleteRequest)
 	r.Delete("/endpoint/{endpointID}", h.DeleteEndpoint)
 	r.Get("/ws/{endpointID}", h.WebSocket)
+	r.Get("/{endpointID}/more", h.LoadMoreRequests)
 	r.Get("/{endpointID}", h.Dashboard)
 
 	// Webhook receiver - accept ALL HTTP methods (GET, POST, PUT, PATCH, DELETE, etc.)

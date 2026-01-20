@@ -67,7 +67,15 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	requests, err := h.Store.GetRequests(r.Context(), endpointID, 50)
+	// Default to 100 requests, configurable via query param
+	limit := 100
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 500 {
+			limit = l
+		}
+	}
+
+	requests, err := h.Store.GetRequests(r.Context(), endpointID, limit)
 	if err != nil {
 		log.Printf("Error getting requests for endpoint %s: %v", endpointID, err)
 		http.Error(w, "failed to fetch requests", http.StatusInternalServerError)
@@ -175,18 +183,28 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		host = "webhook.pipeops.app" // fallback
 	}
 
+	// Get total count for pagination
+	totalCount, _ := h.Store.CountRequests(r.Context(), endpointID)
+	hasMore := len(requests) < totalCount
+
 	data := struct {
 		Endpoint       *store.Endpoint
 		Requests       []*store.Request
 		FirstRequest   *requestDetailData
 		OtherEndpoints []*store.Endpoint
 		Host           string
+		TotalCount     int
+		HasMore        bool
+		Limit          int
 	}{
 		Endpoint:       endpoint,
 		Requests:       requests,
 		FirstRequest:   firstRequest,
 		OtherEndpoints: otherEndpoints,
 		Host:           host,
+		TotalCount:     totalCount,
+		HasMore:        hasMore,
+		Limit:          limit,
 	}
 
 	if err := dashboardTemplate.ExecuteTemplate(w, "layout", data); err != nil {
@@ -196,6 +214,64 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to render page", http.StatusInternalServerError)
 		return
 	}
+}
+
+func (h *Handler) LoadMoreRequests(w http.ResponseWriter, r *http.Request) {
+	endpointID := chi.URLParam(r, "endpointID")
+	if endpointID == "" {
+		http.Error(w, "missing endpoint ID", http.StatusBadRequest)
+		return
+	}
+
+	// Parse offset and limit from query params
+	offset := 0
+	limit := 50
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+			offset = o
+		}
+	}
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+
+	requests, err := h.Store.GetRequestsWithOffset(r.Context(), endpointID, limit, offset)
+	if err != nil {
+		http.Error(w, "failed to fetch requests", http.StatusInternalServerError)
+		return
+	}
+
+	// Get total count to determine if there's more
+	totalCount, _ := h.Store.CountRequests(r.Context(), endpointID)
+	hasMore := (offset + len(requests)) < totalCount
+
+	// Render request items as HTML fragments
+	var buf strings.Builder
+	for _, req := range requests {
+		var itemBuf strings.Builder
+		if err := dashboardTemplate.ExecuteTemplate(&itemBuf, "request-item", req); err != nil {
+			continue
+		}
+		buf.WriteString(itemBuf.String())
+	}
+
+	// If there's more, include the "Load More" button
+	if hasMore {
+		nextOffset := offset + len(requests)
+		buf.WriteString(`<li id="load-more-container" class="p-4 text-center">
+			<button hx-get="/` + endpointID + `/more?offset=` + strconv.Itoa(nextOffset) + `&limit=` + strconv.Itoa(limit) + `"
+					hx-target="#load-more-container"
+					hx-swap="outerHTML"
+					class="text-xs font-bold text-brand-400 hover:text-brand-300 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition-all">
+				<i class="fas fa-chevron-down mr-2"></i>Load More (` + strconv.Itoa(totalCount-nextOffset) + ` remaining)
+			</button>
+		</li>`)
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(buf.String()))
 }
 
 func (h *Handler) RequestDetail(w http.ResponseWriter, r *http.Request) {
