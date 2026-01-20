@@ -2,10 +2,8 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -166,26 +164,6 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 			ContentType: contentType,
 			IsBinary:    isBinary,
 		}
-
-		// #region agent log
-		func() {
-			f, _ := os.OpenFile("/Users/nitrocode/webhook/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-			if f != nil {
-				defer f.Close()
-				json.NewEncoder(f).Encode(map[string]interface{}{
-					"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A",
-					"location": "ui.go:159", "message": "FirstRequest data before template",
-					"data": map[string]interface{}{
-						"requestID": requests[0].ID, "endpointID": requests[0].EndpointID,
-						"idHasQuotes":         strings.Contains(fmt.Sprintf("%d", requests[0].ID), "\""),
-						"endpointIDHasQuotes": strings.Contains(requests[0].EndpointID, "\""),
-						"idHasSpecialChars":   len(fmt.Sprintf("%d", requests[0].ID)) != len(strings.TrimSpace(fmt.Sprintf("%d", requests[0].ID))),
-					},
-					"timestamp": time.Now().UnixMilli(),
-				})
-			}
-		}()
-		// #endregion
 	}
 
 	// Get host, with fallback
@@ -211,50 +189,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		Host:           host,
 	}
 
-	// #region agent log
-	func() {
-		f, _ := os.OpenFile("/Users/nitrocode/webhook/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if f != nil {
-			defer f.Close()
-			firstReqID := int64(0)
-			firstReqEndpointID := ""
-			if firstRequest != nil && firstRequest.Request != nil {
-				firstReqID = firstRequest.ID
-				firstReqEndpointID = firstRequest.EndpointID
-			}
-			json.NewEncoder(f).Encode(map[string]interface{}{
-				"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B",
-				"location": "ui.go:192", "message": "Before template execution",
-				"data": map[string]interface{}{
-					"firstRequestID": firstReqID, "firstRequestEndpointID": firstReqEndpointID,
-					"endpointID": endpointID, "host": host,
-					"idStr":                    fmt.Sprintf("%d", firstReqID),
-					"idContainsQuotes":         strings.Contains(fmt.Sprintf("%d", firstReqID), "\""),
-					"endpointIDContainsQuotes": strings.Contains(firstReqEndpointID, "\""),
-				},
-				"timestamp": time.Now().UnixMilli(),
-			})
-		}
-	}()
-	// #endregion
-
 	if err := dashboardTemplate.ExecuteTemplate(w, "layout", data); err != nil {
-		// #region agent log
-		func() {
-			f, _ := os.OpenFile("/Users/nitrocode/webhook/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-			if f != nil {
-				defer f.Close()
-				json.NewEncoder(f).Encode(map[string]interface{}{
-					"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C",
-					"location": "ui.go:212", "message": "Template execution error",
-					"data": map[string]interface{}{
-						"error": err.Error(), "errorString": fmt.Sprintf("%v", err),
-					},
-					"timestamp": time.Now().UnixMilli(),
-				})
-			}
-		}()
-		// #endregion
 		log.Printf("template execution error: %v", err)
 		log.Printf("Template data: Endpoint=%v, Requests=%d, FirstRequest=%v, Host=%s",
 			endpoint != nil, len(requests), firstRequest != nil, host)
