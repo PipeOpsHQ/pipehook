@@ -103,7 +103,45 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 			previewLen = 500
 		}
 		log.Printf("✅ Body captured successfully: %d bytes", actualBodyLen)
-		log.Printf("Body preview (first %d bytes): %q", previewLen, string(body[:previewLen]))
+
+		// Try to format JSON preview nicely, otherwise show raw preview
+		preview := body[:previewLen]
+		var previewStr string
+		if json.Valid(preview) {
+			// It's valid JSON, try to format it
+			var jsonObj interface{}
+			if err := json.Unmarshal(preview, &jsonObj); err == nil {
+				if formatted, err := json.MarshalIndent(jsonObj, "", "  "); err == nil {
+					previewStr = string(formatted)
+					if len(previewStr) > 500 {
+						previewStr = previewStr[:500] + "..."
+					}
+					log.Printf("Body preview (JSON, first %d bytes):\n%s", previewLen, previewStr)
+				} else {
+					previewStr = string(preview)
+					log.Printf("Body preview (first %d bytes): %s", previewLen, previewStr)
+				}
+			} else {
+				previewStr = string(preview)
+				log.Printf("Body preview (first %d bytes): %s", previewLen, previewStr)
+			}
+		} else {
+			// Not JSON, show raw preview (limit to safe printable characters)
+			previewStr = string(preview)
+			// Check if it's mostly printable
+			printableCount := 0
+			for _, b := range preview {
+				if b >= 32 && b < 127 || b == '\n' || b == '\r' || b == '\t' {
+					printableCount++
+				}
+			}
+			if float64(printableCount)/float64(len(preview)) > 0.8 {
+				log.Printf("Body preview (first %d bytes): %s", previewLen, previewStr)
+			} else {
+				log.Printf("Body preview (first %d bytes, binary): %d bytes of binary data", previewLen, len(preview))
+			}
+		}
+
 		if contentLength > 0 && int64(actualBodyLen) != contentLength {
 			log.Printf("⚠️  NOTE: Body length mismatch - Content-Length=%d, Actual=%d (difference: %d bytes)",
 				contentLength, actualBodyLen, contentLength-int64(actualBodyLen))
