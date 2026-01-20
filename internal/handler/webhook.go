@@ -8,8 +8,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
-	"time"
 
 	"github.com/PipeOpsHQ/pipehook/internal/store"
 	"github.com/go-chi/chi/v5"
@@ -43,25 +41,6 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Query params: %s", queryParams)
 	log.Printf("All headers: %+v", r.Header)
 
-	// #region agent log
-	func() {
-		f, _ := os.OpenFile("/Users/nitrocode/webhook/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if f != nil {
-			defer f.Close()
-			json.NewEncoder(f).Encode(map[string]interface{}{
-				"sessionId": "debug-session", "runId": "run1", "hypothesisId": "A",
-				"location": "webhook.go:44", "message": "Before reading body",
-				"data": map[string]interface{}{
-					"contentType": contentType, "contentLength": contentLength,
-					"isFormUrlencoded": contentType == "application/x-www-form-urlencoded",
-					"bodyAlreadyRead": r.Body == nil,
-				},
-				"timestamp": time.Now().UnixMilli(),
-			})
-		}
-	}()
-	// #endregion
-
 	// Read body - even if Content-Length is 0, we should still try to read
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -72,31 +51,6 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	actualBodyLen := len(body)
-
-	// #region agent log
-	func() {
-		f, _ := os.OpenFile("/Users/nitrocode/webhook/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-		if f != nil {
-			defer f.Close()
-			bodyPreview := ""
-			if actualBodyLen > 0 && actualBodyLen <= 200 {
-				bodyPreview = string(body)
-			} else if actualBodyLen > 200 {
-				bodyPreview = string(body[:200]) + "..."
-			}
-			json.NewEncoder(f).Encode(map[string]interface{}{
-				"sessionId": "debug-session", "runId": "run1", "hypothesisId": "B",
-				"location": "webhook.go:52", "message": "After reading body",
-				"data": map[string]interface{}{
-					"contentType": contentType, "contentLength": contentLength,
-					"actualBodyLen": actualBodyLen, "bodyPreview": bodyPreview,
-					"isFormUrlencoded": contentType == "application/x-www-form-urlencoded",
-				},
-				"timestamp": time.Now().UnixMilli(),
-			})
-		}
-	}()
-	// #endregion
 	log.Printf("=== BODY DEBUG ===")
 	log.Printf("Content-Length header: %d, Actual bytes read: %d", contentLength, actualBodyLen)
 	log.Printf("Transfer-Encoding: %s", transferEncoding)
@@ -124,52 +78,13 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 		log.Printf("⚠️  NOTE: Query params present but body is empty: %s", queryParams)
 	}
 
-	// For form-urlencoded with body, verify it's captured correctly
-	if contentType == "application/x-www-form-urlencoded" && actualBodyLen > 0 {
-		// #region agent log
-		func() {
-			f, _ := os.OpenFile("/Users/nitrocode/webhook/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-			if f != nil {
-				defer f.Close()
-				json.NewEncoder(f).Encode(map[string]interface{}{
-					"sessionId": "debug-session", "runId": "run1", "hypothesisId": "C",
-					"location": "webhook.go:100", "message": "Form-urlencoded with body captured",
-					"data": map[string]interface{}{
-						"bodyLen": actualBodyLen, "bodyContent": string(body),
-						"isValidFormData": len(body) > 0 && (bytes.Contains(body, []byte("=")) || bytes.Contains(body, []byte("&"))),
-					},
-					"timestamp": time.Now().UnixMilli(),
-				})
-			}
-		}()
-		// #endregion
-		log.Printf("✅ Form-urlencoded body captured: %d bytes", actualBodyLen)
-	} else if contentType == "application/x-www-form-urlencoded" && actualBodyLen == 0 {
-		// #region agent log
-		func() {
-			f, _ := os.OpenFile("/Users/nitrocode/webhook/.cursor/debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-			if f != nil {
-				defer f.Close()
-				json.NewEncoder(f).Encode(map[string]interface{}{
-					"sessionId": "debug-session", "runId": "run1", "hypothesisId": "D",
-					"location": "webhook.go:115", "message": "Form-urlencoded with empty body",
-					"data": map[string]interface{}{
-						"contentLength": contentLength, "queryParams": queryParams,
-						"hasQueryParams": queryParams != "",
-					},
-					"timestamp": time.Now().UnixMilli(),
-				})
-			}
-		}()
-		// #endregion
-		// For form-urlencoded with empty body, check if it's in query params
-		// (some systems send form data as query params when body is empty)
-		if queryParams != "" {
-			log.Printf("⚠️  Form-urlencoded with empty body but query params exist - body might be in query string")
-			body = []byte(queryParams)
-			actualBodyLen = len(body)
-			log.Printf("⚠️  Using query params as body: %d bytes", actualBodyLen)
-		}
+	// For form-urlencoded with empty body, check if it's in query params
+	// (some systems send form data as query params when body is empty)
+	if contentType == "application/x-www-form-urlencoded" && actualBodyLen == 0 && queryParams != "" {
+		log.Printf("⚠️  Form-urlencoded with empty body but query params exist - body might be in query string")
+		body = []byte(queryParams)
+		actualBodyLen = len(body)
+		log.Printf("⚠️  Using query params as body: %d bytes", actualBodyLen)
 	}
 	log.Printf("==================")
 
