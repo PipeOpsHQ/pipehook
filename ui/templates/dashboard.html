@@ -1,5 +1,5 @@
 {{ define "content" }}
-<div class="h-full flex overflow-hidden">
+<div id="dashboard-vue-app" class="h-full flex overflow-hidden">
     <!-- Compact Request List -->
     <div class="w-80 lg:w-96 border-r border-slate-800 bg-slate-900/30 flex flex-col shrink-0">
         <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
@@ -39,12 +39,13 @@
             <div class="flex items-center gap-3 whitespace-nowrap">
                 {{ if .OtherEndpoints }}
                 <div class="relative" id="switch-container">
-                    <button onclick="document.getElementById('switch-dropdown').classList.toggle('hidden')" class="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
+                    <button @click="toggleSwitchDropdown" class="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
                         <i class="fas fa-exchange-alt text-[10px]"></i>
                         Switch
-                        <i class="fas fa-chevron-down text-[8px]"></i>
+                        <i class="fas fa-chevron-down text-[8px]" :class="{ 'rotate-180': switchDropdownOpen }"></i>
                     </button>
-                    <div id="switch-dropdown" class="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-lg shadow-xl py-1 z-50 hidden">
+                    <transition name="dropdown">
+                        <div v-if="switchDropdownOpen" class="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-800 rounded-lg shadow-xl py-1 z-50">
                         {{ range .OtherEndpoints }}
                         <a href="/{{ .ID }}" class="block px-4 py-2 text-[10px] font-mono text-slate-400 hover:text-white hover:bg-slate-800 truncate">
                             {{ .ID }}
@@ -55,7 +56,8 @@
                                 <i class="fas fa-plus text-[8px] mr-2"></i>Create New
                             </a>
                         </div>
-                    </div>
+                        </div>
+                    </transition>
                 </div>
                 {{ end }}
                 <span class="flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -78,15 +80,17 @@
 
         <!-- Request Detail Placeholder/Content -->
         <div id="request-detail" class="flex-1 overflow-hidden flex flex-col relative transition-opacity duration-150">
-            <!-- Loading overlay -->
-            <div id="request-detail-loading" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-10 flex items-center justify-center">
-                <div class="text-center">
-                    <div class="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                    <p class="text-xs text-slate-400">Loading...</p>
+            <!-- Loading overlay with Vue transition -->
+            <transition name="fade">
+                <div v-if="isLoading" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-10 flex items-center justify-center">
+                    <div class="text-center">
+                        <div class="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                        <p class="text-xs text-slate-400">Loading...</p>
+                    </div>
                 </div>
-            </div>
-            <!-- Content wrapper with opacity transition -->
-            <div id="request-detail-content" class="flex-1 overflow-hidden flex flex-col transition-opacity duration-200 ease-in-out" style="opacity: 1;">
+            </transition>
+            <!-- Content wrapper -->
+            <div id="request-detail-content" :class="{ 'opacity-40': isLoading }" class="flex-1 overflow-hidden flex flex-col transition-opacity duration-200 ease-in-out">
                 {{ if .FirstRequest }}
                     {{ template "request-detail" .FirstRequest }}
                 {{ else }}
@@ -105,18 +109,72 @@
 
     <script>
         (function() {
+            const { createApp } = Vue;
+
+            // Vue app for dashboard interactions
+            const dashboardApp = createApp({
+                data() {
+                    return {
+                        isLoading: false,
+                        selectedRequestId: null,
+                        switchDropdownOpen: false
+                    }
+                },
+                methods: {
+                    handleRequestClick(requestId) {
+                        this.selectedRequestId = requestId;
+                        this.isLoading = true;
+                    },
+                    handleRequestLoaded() {
+                        this.isLoading = false;
+                    },
+                    toggleSwitchDropdown() {
+                        this.switchDropdownOpen = !this.switchDropdownOpen;
+                    },
+                    closeSwitchDropdown(event) {
+                        const container = document.getElementById('switch-container');
+                        if (container && !container.contains(event.target)) {
+                            this.switchDropdownOpen = false;
+                        }
+                    }
+                },
+                mounted() {
+                    // Close dropdown when clicking outside
+                    document.addEventListener('click', this.closeSwitchDropdown);
+
+                    // Handle HTMX events for smooth transitions
+                    const self = this;
+                    document.body.addEventListener('htmx:beforeRequest', function(e) {
+                        if (e.detail.target && e.detail.target.id === 'request-detail-content') {
+                            self.isLoading = true;
+                            // Extract request ID from the URL
+                            const url = e.detail.pathInfo ? e.detail.pathInfo.requestPath : e.detail.requestURL || '';
+                            const match = url.match(/\/r\/(\d+)/);
+                            if (match) {
+                                self.selectedRequestId = parseInt(match[1]);
+                            }
+                        }
+                    });
+
+                    document.body.addEventListener('htmx:afterSwap', function(e) {
+                        if (e.detail.target && e.detail.target.id === 'request-detail-content') {
+                            setTimeout(() => {
+                                self.isLoading = false;
+                            }, 150);
+                        }
+                    });
+                },
+                beforeUnmount() {
+                    document.removeEventListener('click', this.closeSwitchDropdown);
+                }
+            });
+
+            // Mount Vue app
+            dashboardApp.mount('#dashboard-vue-app');
+
             if (typeof saveEndpoint === 'function') {
                 saveEndpoint('{{ .Endpoint.ID }}');
             }
-
-            // Close dropdown when clicking outside
-            document.addEventListener('click', function(event) {
-                const container = document.getElementById('switch-container');
-                const dropdown = document.getElementById('switch-dropdown');
-                if (container && dropdown && !container.contains(event.target)) {
-                    dropdown.classList.add('hidden');
-                }
-            });
 
             // WebSocket connection for real-time updates
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -175,9 +233,7 @@
              hx-get="/r/{{ .ID }}"
              hx-target="#request-detail-content"
              hx-swap="innerHTML"
-             hx-indicator="#request-detail-loading"
-             hx-on::before-request="const content = document.getElementById('request-detail-content'); const loading = document.getElementById('request-detail-loading'); if(content) { content.style.opacity = '0.4'; } if(loading) { loading.classList.remove('hidden'); }"
-             hx-on::after-request="setTimeout(() => { const content = document.getElementById('request-detail-content'); const loading = document.getElementById('request-detail-loading'); if(content) { content.style.opacity = '1'; content.classList.add('fade-in'); } if(loading) { loading.classList.add('hidden'); } }, 50);">
+             @click="handleRequestClick({{ .ID }})">
             <div class="flex items-center justify-between mb-2">
                 <span class="text-xs font-bold {{ if eq .Method "GET" }}text-emerald-500 bg-emerald-500/10 border-emerald-500/20{{ else }}text-brand-400 bg-brand-500/10 border-brand-500/20{{ end }} font-mono px-2 py-0.5 rounded border">{{ .Method }}</span>
                 <span class="text-[10px] text-slate-500 font-mono tracking-tighter" data-timestamp="{{ .CreatedAt.Format "2006-01-02T15:04:05Z07:00" }}">{{ .CreatedAt.Format "15:04:05" }}</span>

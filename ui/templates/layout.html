@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PipeHooks</title>
     <link rel="icon" type="image/svg+xml" href="/static/pipehook.svg">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/sse.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -24,6 +25,35 @@
         }
         .fade-in {
             animation: fadeIn 0.2s ease-in-out;
+        }
+        /* Vue transitions */
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.2s ease-in-out;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+        .dropdown-enter-active, .dropdown-leave-active {
+            transition: all 0.2s ease-out;
+        }
+        .dropdown-enter-from {
+            opacity: 0;
+            transform: translateY(-10px) scale(0.95);
+        }
+        .dropdown-leave-to {
+            opacity: 0;
+            transform: translateY(-10px) scale(0.95);
+        }
+        .slide-enter-active, .slide-leave-active {
+            transition: all 0.3s ease;
+        }
+        .slide-enter-from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+        .slide-leave-to {
+            opacity: 0;
+            transform: translateX(20px);
         }
     </style>
     <script>
