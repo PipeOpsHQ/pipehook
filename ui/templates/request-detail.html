@@ -1,5 +1,5 @@
 {{ define "request-detail" }}
-<div class="flex flex-col h-full overflow-hidden">
+<div class="flex flex-col h-full overflow-hidden" data-content-type="{{ .ContentType }}">
     <!-- Compact Header -->
     <div class="px-4 py-2 border-b border-slate-800 bg-slate-900/40 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-3 min-w-0">
@@ -16,11 +16,12 @@
                 Replay
             </button>
             <button class="text-[10px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded-md transition-all active:scale-95 flex items-center gap-1.5 shadow-lg shadow-red-600/5"
-                    hx-delete="/r/{{ .ID }}"
-                    hx-target="body"
-                    hx-swap="none"
                     data-request-id="{{ .ID }}"
                     data-endpoint-id="{{ .EndpointID }}"
+                    hx-delete=""
+                    hx-target="body"
+                    hx-swap="none"
+                    hx-on::before-request="setDeleteRequestUrl(this)"
                     hx-on::after-request="handleDeleteRequest(this)">
                 <i class="fas fa-trash-can text-[9px]"></i>
                 Delete
@@ -132,6 +133,14 @@
             }
             window.handleReplayAfter = handleReplayAfter;
 
+            function setDeleteRequestUrl(button) {
+                const requestId = button ? button.getAttribute('data-request-id') : null;
+                if(requestId) {
+                    button.setAttribute('hx-delete', '/r/' + requestId);
+                }
+            }
+            window.setDeleteRequestUrl = setDeleteRequestUrl;
+
             function handleDeleteRequest(button) {
                 // HTMX provides event as a global variable
                 if(typeof event !== 'undefined' && event.detail && event.detail.xhr && event.detail.xhr.status === 200) {
@@ -171,7 +180,8 @@
 
             const bodyRaw = document.getElementById('body-raw');
             const lineNumbers = document.getElementById('line-numbers');
-            const contentType = '{{ .ContentType }}';
+            const contentTypeElement = document.querySelector('[data-content-type]');
+            const contentType = contentTypeElement ? contentTypeElement.getAttribute('data-content-type') : 'text/plain';
             let isJSON = false;
             let isXML = false;
             let isHTML = false;
