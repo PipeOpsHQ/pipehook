@@ -19,21 +19,21 @@
                     hx-delete="/r/{{ .ID }}"
                     hx-target="body"
                     hx-swap="none"
-                    hx-on::after-request="if(event.detail.xhr.status === 200) {
+                    hx-on::after-request='if(event.detail.xhr.status === 200) {
                         // Remove from list if it exists
-                        const listItem = document.querySelector('[data-request-id=\"{{ .ID }}\"]');
+                        const listItem = document.querySelector(`[data-request-id="{{ .ID }}"]`);
                         if (listItem) {
                             listItem.remove();
                             // Update count
-                            const count = document.getElementById('request-count');
+                            const count = document.getElementById("request-count");
                             if (count) {
                                 const current = parseInt(count.innerText) || 0;
                                 count.innerText = Math.max(0, current - 1);
                             }
                         }
                         // Redirect to dashboard
-                        window.location.href = '/{{ .EndpointID }}';
-                    }">
+                        window.location.href = "/{{ .EndpointID }}";
+                    }'>
                 <i class="fas fa-trash-can text-[9px]"></i>
                 Delete
             </button>
