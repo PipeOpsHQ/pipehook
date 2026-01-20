@@ -33,12 +33,22 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	transferEncoding := r.Header.Get("Transfer-Encoding")
 	queryParams := r.URL.RawQuery
 
+	// Detect Cloudflare and other proxies
+	isCloudflare := r.Header.Get("Cf-Ray") != "" || r.Header.Get("Cdn-Loop") != ""
+	hasProxyHeaders := r.Header.Get("X-Forwarded-For") != "" || r.Header.Get("X-Real-Ip") != ""
+
 	log.Printf("=== REQUEST DEBUG ===")
 	log.Printf("Method: %s, Path: %s, RemoteAddr: %s", r.Method, r.URL.Path, r.RemoteAddr)
 	log.Printf("Content-Length header: %d", contentLength)
 	log.Printf("Content-Type: %s", contentType)
 	log.Printf("Transfer-Encoding: %s", transferEncoding)
 	log.Printf("Query params: %s", queryParams)
+	if isCloudflare {
+		log.Printf("⚠️  Cloudflare detected (Cf-Ray: %s, Cdn-Loop: %s)", r.Header.Get("Cf-Ray"), r.Header.Get("Cdn-Loop"))
+	}
+	if hasProxyHeaders {
+		log.Printf("⚠️  Proxy detected (X-Forwarded-For: %s, X-Real-Ip: %s)", r.Header.Get("X-Forwarded-For"), r.Header.Get("X-Real-Ip"))
+	}
 	log.Printf("All headers: %+v", r.Header)
 
 	// Check if body has been consumed and attempt restoration
@@ -102,12 +112,17 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 		// Content-Length says there should be a body, but we got nothing
 		log.Printf("❌ CRITICAL: Content-Length=%d but captured 0 bytes!", contentLength)
 		log.Printf("⚠️  Possible causes:")
+		if isCloudflare {
+			log.Printf("   - ⚠️  CLOUDFLARE MAY BE CONSUMING THE BODY")
+			log.Printf("     Cloudflare WAF or proxy settings may be inspecting/stripping request bodies")
+			log.Printf("     Check Cloudflare settings: Page Rules, WAF rules, or proxy mode settings")
+		}
 		log.Printf("   - Body consumed by middleware/proxy before handler")
 		log.Printf("   - Body consumed by previous handler/middleware")
 		log.Printf("   - Proxy/load balancer stripping body")
 		log.Printf("   - Request body stream already closed")
 		if r.GetBody == nil {
-			log.Printf("   - GetBody() not available (cannot restore)")
+			log.Printf("   - GetBody() not available (cannot restore) - common with proxy/Cloudflare requests")
 		}
 	} else if transferEncoding == "chunked" {
 		// Chunked encoding might not have Content-Length
@@ -139,6 +154,12 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Content-Type: %s", contentType)
 	if actualBodyLen == 0 && contentLength > 0 {
 		log.Printf("❌ BODY CAPTURE FAILED - Expected %d bytes but got 0", contentLength)
+		if isCloudflare {
+			log.Printf("⚠️  CLOUDFLARE DETECTED - This is likely a Cloudflare configuration issue")
+			log.Printf("   Recommendation: Check Cloudflare proxy settings or disable proxy for this route")
+		}
+	} else if actualBodyLen == 0 && contentLength == 0 && isCloudflare {
+		log.Printf("⚠️  NOTE: Empty body with Cloudflare - client may not be sending body, or Cloudflare is consuming it")
 	}
 	log.Printf("==================")
 
