@@ -226,6 +226,42 @@
             // Mount Vue app
             dashboardApp.mount('#dashboard-vue-app');
 
+            // Handle request item click
+            function handleRequestItemClick(element) {
+                // Remove active state from all items
+                document.querySelectorAll('#request-list li').forEach(el => {
+                    el.classList.remove('bg-slate-800/50', 'shadow-inner');
+                });
+                // Add active state to clicked item
+                element.classList.add('bg-slate-800/50', 'shadow-inner');
+                // Apply endpoint color if not already applied
+                const endpointId = element.getAttribute('data-endpoint-id');
+                if(endpointId && typeof getEndpointColor === 'function') {
+                    const color = getEndpointColor(endpointId);
+                    if(color && element.dataset.endpointColorBorder === '') {
+                        element.classList.add(color.border);
+                        element.dataset.endpointColorBorder = color.border;
+                    }
+                }
+            }
+            window.handleRequestItemClick = handleRequestItemClick;
+
+            // Handle delete request from list
+            function handleDeleteRequestFromList(button) {
+                if(typeof event !== 'undefined' && event.detail && event.detail.xhr && event.detail.xhr.status === 200) {
+                    const listItem = button.closest('li');
+                    if(listItem) {
+                        listItem.remove();
+                        const count = document.getElementById('request-count');
+                        if(count) {
+                            const current = parseInt(count.innerText) || 0;
+                            count.innerText = Math.max(0, current - 1);
+                        }
+                    }
+                }
+            }
+            window.handleDeleteRequestFromList = handleDeleteRequestFromList;
+
             // Apply colors to request items and dropdown after Vue is mounted
             function applyEndpointColors() {
                 document.querySelectorAll('[data-endpoint-id]').forEach(el => {
@@ -317,7 +353,7 @@
     data-request-id="{{ .ID }}"
     data-endpoint-id="{{ .EndpointID }}"
     data-endpoint-color-border=""
-    onclick="document.querySelectorAll('#request-list li').forEach(el => el.classList.remove('bg-slate-800/50', 'shadow-inner')); this.classList.add('bg-slate-800/50', 'shadow-inner'); const color = getEndpointColor('{{ .EndpointID }}'); if(color && this.dataset.endpointColorBorder === '') { this.classList.add(color.border); this.dataset.endpointColorBorder = color.border; }">
+    onclick="handleRequestItemClick(this)">
     <div class="px-4 py-4 flex items-start justify-between gap-3">
         <div class="flex-1 min-w-0 cursor-pointer"
              hx-get="/r/{{ .ID }}"
@@ -338,7 +374,7 @@
                 hx-delete="/r/{{ .ID }}"
                 hx-target="closest li"
                 hx-swap="outerHTML"
-                hx-on::after-request="if(event.detail.xhr.status === 200) { this.closest('li').remove(); const count = document.getElementById('request-count'); if(count) { const current = parseInt(count.innerText) || 0; count.innerText = Math.max(0, current - 1); } }"
+                hx-on::after-request="handleDeleteRequestFromList(this)"
                 onclick="event.stopPropagation();">
             <i class="fas fa-trash-can text-[10px]"></i>
         </button>
