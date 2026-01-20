@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +16,33 @@ import (
 	"github.com/PipeOpsHQ/pipehook/internal/store"
 	"github.com/PipeOpsHQ/pipehook/ui"
 )
+
+// parseSize parses a size string like "50MB", "100KB", "1GB" into bytes
+func parseSize(s string) (int64, error) {
+	s = strings.TrimSpace(s)
+	s = strings.ToUpper(s)
+
+	var multiplier int64 = 1
+	if strings.HasSuffix(s, "KB") {
+		multiplier = 1024
+		s = strings.TrimSuffix(s, "KB")
+	} else if strings.HasSuffix(s, "MB") {
+		multiplier = 1024 * 1024
+		s = strings.TrimSuffix(s, "MB")
+	} else if strings.HasSuffix(s, "GB") {
+		multiplier = 1024 * 1024 * 1024
+		s = strings.TrimSuffix(s, "GB")
+	} else if strings.HasSuffix(s, "B") {
+		s = strings.TrimSuffix(s, "B")
+	}
+
+	val, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid size format: %v", err)
+	}
+
+	return val * multiplier, nil
+}
 
 func main() {
 	dbPath := os.Getenv("DATABASE_PATH")
@@ -120,8 +149,17 @@ func main() {
 		port = "8080"
 	}
 
+	srv := &http.Server{
+		Addr:           ":" + port,
+		Handler:        r,
+		MaxHeaderBytes: 1 << 20, // 1MB max header size
+		ReadTimeout:    30 * time.Second,
+		WriteTimeout:   30 * time.Second,
+		IdleTimeout:    120 * time.Second,
+	}
+
 	log.Printf("Starting server on :%s", port)
-	if err := http.ListenAndServe(":"+port, r); err != nil {
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
 	}
 }
