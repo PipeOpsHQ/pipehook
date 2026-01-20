@@ -117,55 +117,55 @@
         <script type="text/plain">
         (function() {
             function setReplayUrl(button) {
-                const requestId = button ? button.getAttribute('data-request-id') : null;
+                const requestId = button ? button.getAttribute("data-request-id") : null;
                 if(requestId) {
-                    button.setAttribute('hx-post', '/r/' + requestId + '/replay');
+                    button.setAttribute("hx-post", "/r/" + requestId + "/replay");
                 }
             }
             window.setReplayUrl = setReplayUrl;
 
             function handleReplayBefore(button) {
                 if(button) {
-                    button.classList.add('opacity-50', 'pointer-events-none');
-                    const icon = button.querySelector('i');
-                    if(icon) icon.classList.add('animate-spin');
+                    button.classList.add("opacity-50", "pointer-events-none");
+                    const icon = button.querySelector("i");
+                    if(icon) icon.classList.add("animate-spin");
                 }
             }
             window.handleReplayBefore = handleReplayBefore;
 
             function handleReplayAfter(button) {
                 if(button) {
-                    button.classList.remove('opacity-50', 'pointer-events-none');
-                    const icon = button.querySelector('i');
-                    if(icon) icon.classList.remove('animate-spin');
+                    button.classList.remove("opacity-50", "pointer-events-none");
+                    const icon = button.querySelector("i");
+                    if(icon) icon.classList.remove("animate-spin");
                 }
             }
             window.handleReplayAfter = handleReplayAfter;
 
             function setDeleteRequestUrl(button) {
-                const requestId = button ? button.getAttribute('data-request-id') : null;
+                const requestId = button ? button.getAttribute("data-request-id") : null;
                 if(requestId) {
-                    button.setAttribute('hx-delete', '/r/' + requestId);
+                    button.setAttribute("hx-delete", "/r/" + requestId);
                 }
             }
             window.setDeleteRequestUrl = setDeleteRequestUrl;
 
             function handleDeleteRequest(button) {
                 // HTMX provides event as a global variable
-                if(typeof event !== 'undefined' && event.detail && event.detail.xhr && event.detail.xhr.status === 200) {
-                    const requestId = button.getAttribute('data-request-id');
-                    const endpointId = button.getAttribute('data-endpoint-id');
+                if(typeof event !== "undefined" && event.detail && event.detail.xhr && event.detail.xhr.status === 200) {
+                    const requestId = button.getAttribute("data-request-id");
+                    const endpointId = button.getAttribute("data-endpoint-id");
                     if(requestId) {
-                        const listItem = document.querySelector('[data-request-id="' + requestId + '"]');
+                        const listItem = document.querySelector("[data-request-id=\" + requestId + ""]");
                         if(listItem) listItem.remove();
                     }
-                    const count = document.getElementById('request-count');
+                    const count = document.getElementById("request-count");
                     if(count) {
                         const current = parseInt(count.innerText) || 0;
                         count.innerText = Math.max(0, current - 1);
                     }
                     if(endpointId) {
-                        window.location.href = '/' + endpointId;
+                        window.location.href = "/" + endpointId;
                     }
                 }
             }
@@ -173,30 +173,30 @@
 
             function toggleSection(sectionId) {
                 const section = document.getElementById(sectionId);
-                const chevron = document.getElementById(sectionId.replace('-section', '-chevron'));
+                const chevron = document.getElementById(sectionId.replace("-section", "-chevron"));
                 if (section && chevron) {
-                    const isHidden = section.classList.contains('hidden');
+                    const isHidden = section.classList.contains("hidden");
                     if (isHidden) {
-                        section.classList.remove('hidden');
-                        chevron.classList.remove('rotate-180');
+                        section.classList.remove("hidden");
+                        chevron.classList.remove("rotate-180");
                     } else {
-                        section.classList.add('hidden');
-                        chevron.classList.add('rotate-180');
+                        section.classList.add("hidden");
+                        chevron.classList.add("rotate-180");
                     }
                 }
             }
             window.toggleSection = toggleSection;
 
-            const bodyRaw = document.getElementById('body-raw');
-            const lineNumbers = document.getElementById('line-numbers');
-            const contentTypeElement = document.querySelector('[data-content-type]');
-            const contentType = contentTypeElement ? contentTypeElement.getAttribute('data-content-type') : 'text/plain';
+            const bodyRaw = document.getElementById("body-raw");
+            const lineNumbers = document.getElementById("line-numbers");
+            const contentTypeElement = document.querySelector("[data-content-type]");
+            const contentType = contentTypeElement ? contentTypeElement.getAttribute("data-content-type") : "text/plain";
             let isJSON = false;
             let isXML = false;
             let isHTML = false;
 
             function escapeHtml(text) {
-                const div = document.createElement('div');
+                const div = document.createElement("div");
                 div.textContent = text;
                 return div.innerHTML;
             }
@@ -231,7 +231,7 @@
                         } else {
                             cls = 'text-blue-400'; // number
                         }
-                        return '<span class="' + cls + '">' + match + '</span>';
+                        return "<span class="" + cls + "">" + match + "</span>";
                     })
                     .replace(/([{}[\],:])/g, '<span class="text-slate-400">$1</span>');
             }
@@ -247,26 +247,26 @@
                 // Check header first
                 if (headerType) {
                     const lower = headerType.toLowerCase();
-                    if (lower.includes('json')) return 'json';
-                    if (lower.includes('xml')) return 'xml';
-                    if (lower.includes('html')) return 'html';
+                    if (lower.includes("json")) return "json";
+                    if (lower.includes("xml")) return "xml";
+                    if (lower.includes("html")) return "html";
                 }
 
                 // Try to detect from content
                 const trimmed = text.trim();
-                if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+                if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
                     try {
                         JSON.parse(trimmed);
-                        return 'json';
+                        return "json";
                     } catch (e) {}
                 }
-                if (trimmed.startsWith('<?xml') || trimmed.startsWith('<') && trimmed.includes('>')) {
-                    if (trimmed.includes('<!DOCTYPE html') || trimmed.includes('<html')) {
-                        return 'html';
+                if (trimmed.startsWith("<?xml") || trimmed.startsWith("<") && trimmed.includes(">")) {
+                    if (trimmed.includes("<!DOCTYPE html") || trimmed.includes("<html")) {
+                        return "html";
                     }
-                    return 'xml';
+                    return "xml";
                 }
-                return 'text';
+                return "text";
             }
 
             function formatXML(xml) {
@@ -275,8 +275,8 @@
                 const tab = '  ';
                 xml.split(/>\s*</).forEach(function(node) {
                     if (node.match(/^\/\w/)) indent--;
-                    formatted += tab.repeat(indent) + '<' + node + '>\r\n';
-                    if (node.match(/^<?\w[^>]*[^\/]$/) && !node.startsWith('<?xml')) indent++;
+                    formatted += tab.repeat(indent) + "<" + node + ">\r\n";
+                    if (node.match(/^<?\w[^>]*[^\/]$/) && !node.startsWith("<?xml")) indent++;
                 });
                 return formatted.substring(1, formatted.length - 2);
             }
@@ -293,7 +293,7 @@
 
                 const detectedType = detectContentType(originalText, contentType);
 
-                if (detectedType === 'json') {
+                if (detectedType === "json") {
                     try {
                         // Parse and format JSON with proper indentation (2 spaces)
                         const json = JSON.parse(originalText);
@@ -325,7 +325,7 @@
 
                 const detectedType = detectContentType(text, contentType);
 
-                if (detectedType === 'json') {
+                if (detectedType === "json") {
                     try {
                         // Parse and format JSON with proper indentation (2 spaces)
                         const json = JSON.parse(text);
@@ -333,30 +333,30 @@
                         bodyRaw.innerHTML = highlightJSON(formatted);
                         isJSON = true;
                         updateLineNumbers();
-                        if (typeof showToast === 'function') {
+                        if (typeof showToast === "function") {
                             showToast('JSON formatted', 'success');
                         }
                     } catch (e) {
-                        if (typeof showToast === 'function') {
+                        if (typeof showToast === "function") {
                             showToast('Not valid JSON: ' + e.message, 'error');
                         }
                     }
-                } else if (detectedType === 'xml') {
+                } else if (detectedType === "xml") {
                     try {
                         const formatted = formatXML(text);
                         bodyRaw.textContent = formatted;
                         isXML = true;
                         updateLineNumbers();
-                        if (typeof showToast === 'function') {
+                        if (typeof showToast === "function") {
                             showToast('XML formatted', 'success');
                         }
                     } catch (e) {
-                        if (typeof showToast === 'function') {
+                        if (typeof showToast === "function") {
                             showToast('Failed to format XML', 'error');
                         }
                     }
                 } else {
-                    if (typeof showToast === 'function') {
+                    if (typeof showToast === "function") {
                         showToast('No formatting available for this content type', 'info');
                     }
                 }
@@ -367,18 +367,18 @@
             function copyBody() {
                 if (!bodyRaw) {
                     // If binary, show message
-                    if (typeof showToast === 'function') {
+                    if (typeof showToast === "function") {
                         showToast('Cannot copy binary content', 'info');
                     }
                     return;
                 }
                 const text = bodyRaw.innerText || bodyRaw.textContent || '';
                 navigator.clipboard.writeText(text).then(() => {
-                    if (typeof showToast === 'function') {
+                    if (typeof showToast === "function") {
                         showToast('Body copied to clipboard', 'success');
                     }
                 }).catch(() => {
-                    if (typeof showToast === 'function') {
+                    if (typeof showToast === "function") {
                         showToast('Failed to copy', 'error');
                     }
                 });
@@ -388,22 +388,22 @@
             let headersViewMode = 'json'; // Default to JSON view
 
             function toggleHeadersView() {
-                const jsonView = document.getElementById('headers-json-view');
-                const listView = document.getElementById('headers-list-view');
-                const toggleBtn = document.getElementById('headers-view-toggle');
+                const jsonView = document.getElementById("headers-json-view");
+                const listView = document.getElementById("headers-list-view");
+                const toggleBtn = document.getElementById("headers-view-toggle");
 
                 if (!jsonView || !listView || !toggleBtn) return;
 
-                if (headersViewMode === 'json') {
+                if (headersViewMode === "json") {
                     // Switch to list view
-                    jsonView.classList.add('hidden');
-                    listView.classList.remove('hidden');
+                    jsonView.classList.add("hidden");
+                    listView.classList.remove("hidden");
                     toggleBtn.innerHTML = '<i class="fas fa-list-ul text-xs"></i>';
                     headersViewMode = 'list';
                 } else {
                     // Switch to JSON view
-                    jsonView.classList.remove('hidden');
-                    listView.classList.add('hidden');
+                    jsonView.classList.remove("hidden");
+                    listView.classList.add("hidden");
                     toggleBtn.innerHTML = '<i class="fas fa-code text-xs"></i>';
                     headersViewMode = 'json';
                 }
@@ -411,18 +411,18 @@
             window.toggleHeadersView = toggleHeadersView;
 
             function copyHeaders() {
-                const jsonView = document.getElementById('headers-json-view');
-                const listView = document.getElementById('headers-list-view');
-                const activeView = headersViewMode === 'json' ? jsonView : listView;
+                const jsonView = document.getElementById("headers-json-view");
+                const listView = document.getElementById("headers-list-view");
+                const activeView = headersViewMode === "json" ? jsonView : listView;
 
                 if (!activeView) return;
                 const text = activeView.innerText || activeView.textContent || '';
                 navigator.clipboard.writeText(text).then(() => {
-                    if (typeof showToast === 'function') {
+                    if (typeof showToast === "function") {
                         showToast('Headers copied to clipboard', 'success');
                     }
                 }).catch(() => {
-                    if (typeof showToast === 'function') {
+                    if (typeof showToast === "function") {
                         showToast('Failed to copy', 'error');
                     }
                 });

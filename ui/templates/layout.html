@@ -68,28 +68,28 @@
         }
 
         function getRecentEndpoints() {
-            return JSON.parse(localStorage.getItem('pipehooks_recents') || '[]');
+            return JSON.parse(localStorage.getItem("pipehooks_recents") || "[]");
         }
 
         function saveEndpoint(id) {
             let recents = getRecentEndpoints();
             if (!recents.includes(id)) {
                 recents.unshift(id);
-                localStorage.setItem('pipehooks_recents', JSON.stringify(recents.slice(0, 10)));
+                localStorage.setItem("pipehooks_recents", JSON.stringify(recents.slice(0, 10)));
             }
             updateHeaderRecents();
         }
 
         function updateHeaderRecents() {
             const recents = getRecentEndpoints();
-            const container = document.getElementById('header-recents');
-            const list = document.getElementById('header-recents-list');
+            const container = document.getElementById("header-recents");
+            const list = document.getElementById("header-recents-list");
 
             if (recents && container && list && recents.length > 0) {
-                container.classList.remove('hidden');
-                list.innerHTML = '';
+                container.classList.remove("hidden");
+                list.innerHTML = "";
                 recents.forEach(id => {
-                    const item = document.createElement('a');
+                    const item = document.createElement("a");
                     item.href = '/' + id;
                     item.className = 'block px-4 py-2 text-[10px] font-mono text-slate-400 hover:text-white hover:bg-slate-800 truncate';
                     item.innerText = id;
@@ -103,24 +103,24 @@
             const now = new Date();
             const seconds = Math.floor((now - date) / 1000);
 
-            if (seconds < 5) return 'just now';
-            if (seconds < 60) return seconds + 's ago';
+            if (seconds < 5) return "just now";
+            if (seconds < 60) return seconds + "s ago";
 
             const minutes = Math.floor(seconds / 60);
-            if (minutes < 60) return minutes + 'm ago';
+            if (minutes < 60) return minutes + "m ago";
 
             const hours = Math.floor(minutes / 60);
-            if (hours < 24) return hours + 'h ago';
+            if (hours < 24) return hours + "h ago";
 
             const days = Math.floor(hours / 24);
-            if (days < 30) return days + 'd ago';
+            if (days < 30) return days + "d ago";
 
             return date.toLocaleDateString();
         }
 
         function updateRelativeTimes() {
-            document.querySelectorAll('[data-timestamp]').forEach(el => {
-                const timestamp = el.getAttribute('data-timestamp');
+            document.querySelectorAll("[data-timestamp]").forEach(el => {
+                const timestamp = el.getAttribute("data-timestamp");
                 if (timestamp) {
                     el.innerText = formatTimeAgo(timestamp);
                 }
@@ -205,10 +205,10 @@
 
         // Custom toast notification system
         function showToast(message, type = 'info', duration = 3000) {
-            const notifications = document.getElementById('notifications');
+            const notifications = document.getElementById("notifications");
             if (!notifications) return;
 
-            const toast = document.createElement('div');
+            const toast = document.createElement("div");
             toast.className = 'px-4 py-3 rounded-lg shadow-xl text-xs font-bold flex items-center gap-2 min-w-[280px] max-w-md transform transition-all duration-300 translate-x-full opacity-0';
 
             // Set colors and icons based on type
@@ -258,7 +258,7 @@
 
         // Handle request replayed event
         document.body.addEventListener('requestReplayed', function(evt) {
-            showToast('Request replayed successfully', 'success');
+            showToast("Request replayed successfully", 'success');
         });
     </script>
 </body>

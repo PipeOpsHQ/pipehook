@@ -193,7 +193,7 @@
                                 content.style.opacity = "0.4";
                             }
                             // Extract request ID from the URL
-                            const url = e.detail.pathInfo ? e.detail.pathInfo.requestPath : e.detail.requestURL || '';
+                            const url = e.detail.pathInfo ? e.detail.pathInfo.requestPath : e.detail.requestURL || "";
                             const match = url.match(/\/r\/(\d+)/);
                             if (match) {
                                 self.selectedRequestId = parseInt(match[1]);
@@ -256,7 +256,7 @@
             function setDeleteEndpointUrl(button) {
                 const endpointId = button ? button.getAttribute("data-endpoint-id") : null;
                 if(endpointId) {
-                    button.setAttribute("hx-delete", '/endpoint/' + endpointId);
+                    button.setAttribute("hx-delete", "/endpoint/" + endpointId);
                 }
             }
             window.setDeleteEndpointUrl = setDeleteEndpointUrl;
@@ -296,7 +296,7 @@
             function setRequestDetailUrl(element) {
                 const requestId = element ? element.getAttribute("data-request-id") : null;
                 if(requestId) {
-                    element.setAttribute("hx-get", '/r/' + requestId);
+                    element.setAttribute("hx-get", "/r/" + requestId);
                 }
             }
             window.setRequestDetailUrl = setRequestDetailUrl;
@@ -305,7 +305,7 @@
             function setDeleteRequestUrl(button) {
                 const requestId = button ? button.getAttribute("data-request-id") : null;
                 if(requestId) {
-                    button.setAttribute("hx-delete", '/r/' + requestId);
+                    button.setAttribute("hx-delete", "/r/" + requestId);
                 }
             }
             window.setDeleteRequestUrl = setDeleteRequestUrl;
@@ -313,7 +313,7 @@
             // Handle delete request from list
             function handleDeleteRequestFromList(button) {
                 if(typeof event !== "undefined" && event.detail && event.detail.xhr && event.detail.xhr.status === 200) {
-                    const listItem = button.closest('li');
+                    const listItem = button.closest("li");
                     if(listItem) {
                         listItem.remove();
                         const count = document.getElementById("request-count");
@@ -334,16 +334,16 @@
                         const color = getEndpointColor(endpointId);
                         if (color) {
                             // Apply border color to list item
-                            if (el.tagName === 'LI') {
+                            if (el.tagName === "LI") {
                                 el.classList.add(color.border);
                             }
                             // Apply border color to dropdown items
-                            if (el.classList.contains('switch-endpoint-item')) {
+                            if (el.classList.contains("switch-endpoint-item")) {
                                 el.classList.add(color.border);
                             }
                             // Apply dot color
-                            const dot = el.querySelector('.endpoint-color-dot[data-endpoint-id="' + endpointId + '"]') ||
-                                       el.querySelector('.switch-endpoint-dot[data-endpoint-id="' + endpointId + '"]');
+                            const dot = el.querySelector(".endpoint-color-dot[data-endpoint-id=\"" + endpointId + "\"]") ||
+                                       el.querySelector(".switch-endpoint-dot[data-endpoint-id=\"" + endpointId + "\"]");
                             if (dot) {
                                 dot.classList.add(color.accent);
                             }
@@ -370,18 +370,18 @@
             }
 
             // WebSocket connection for real-time updates
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
             const endpointIdElement = document.getElementById("endpoint-header");
             const endpointId = endpointIdElement ? endpointIdElement.getAttribute("data-endpoint-id") : null;
             if(endpointId) {
-                const wsUrl = protocol + '//' + window.location.host + '/ws/' + endpointId;
+                const wsUrl = protocol + "//" + window.location.host + "/ws/" + endpointId;
                 const ws = new WebSocket(wsUrl);
                 const requestList = document.getElementById("request-list");
                 const requestCount = document.getElementById("request-count");
 
                 ws.onmessage = function(event) {
                     const data = JSON.parse(event.data);
-                    if (data.type === 'new-request') {
+                    if (data.type === "new-request") {
                         // Create a temporary container to parse the HTML
                         const temp = document.createElement("div");
                         temp.innerHTML = data.payload;
@@ -415,7 +415,7 @@
 
                 ws.onclose = function() {
                     // Connection closed - user can manually refresh if needed
-                    console.log('WebSocket connection closed');
+                    console.log("WebSocket connection closed");
                 };
             }
         })();
