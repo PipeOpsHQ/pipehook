@@ -9,9 +9,9 @@
         <div class="flex items-center gap-1.5">
             <button class="text-[10px] font-bold text-white bg-brand-600 hover:bg-brand-500 px-2.5 py-1 rounded-md transition-all active:scale-95 flex items-center gap-1.5 shadow-lg shadow-brand-600/5"
                     data-request-id="{{ .ID }}"
-                    hx-post=""
+                    hx-post="/r/{{ .ID }}/replay"
                     hx-swap="none"
-                    hx-on::before-request="setReplayUrl(this); handleReplayBefore(this)"
+                    hx-on::before-request="handleReplayBefore(this)"
                     hx-on::after-request="handleReplayAfter(this)">
                 <i class="fas fa-repeat text-[9px]"></i>
                 Replay
@@ -19,10 +19,9 @@
             <button class="text-[10px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded-md transition-all active:scale-95 flex items-center gap-1.5 shadow-lg shadow-red-600/5"
                     data-request-id="{{ .ID }}"
                     data-endpoint-id="{{ .EndpointID }}"
-                    hx-delete=""
+                    hx-delete="/r/{{ .ID }}"
                     hx-target="body"
                     hx-swap="none"
-                    hx-on::before-request="setDeleteRequestUrl(this)"
                     hx-on::after-request="handleDeleteRequest(this)">
                 <i class="fas fa-trash-can text-[9px]"></i>
                 Delete
