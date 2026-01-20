@@ -86,15 +86,13 @@
 
         <!-- Request Detail Placeholder/Content -->
         <div id="request-detail" class="flex-1 overflow-hidden flex flex-col relative transition-opacity duration-150">
-            <!-- Loading overlay with Vue transition -->
-            <transition name="fade">
-                <div v-if="isLoading" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-10 flex items-center justify-center">
-                    <div class="text-center">
-                        <div class="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                        <p class="text-xs text-slate-400">Loading...</p>
-                    </div>
+            <!-- Loading overlay (CSS-only, no Vue transition) -->
+            <div id="loading-overlay" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-10 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-200" style="display: none;">
+                <div class="text-center">
+                    <div class="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                    <p class="text-xs text-slate-400">Loading...</p>
                 </div>
-            </transition>
+            </div>
             <!-- Content wrapper -->
             <div id="request-detail-content" class="flex-1 overflow-hidden flex flex-col transition-opacity duration-200 ease-in-out">
                 {{ if .FirstRequest }}
@@ -115,14 +113,38 @@
 
     <script>
         (function() {
+            // Loading overlay helpers (plain DOM, not Vue)
+            function showLoadingOverlay() {
+                var overlay = document.getElementById("loading-overlay");
+                var content = document.getElementById("request-detail-content");
+                if (overlay) {
+                    overlay.style.display = "flex";
+                    setTimeout(function() { overlay.style.opacity = "1"; }, 10);
+                }
+                if (content) {
+                    content.style.opacity = "0.4";
+                }
+            }
+            function hideLoadingOverlay() {
+                var overlay = document.getElementById("loading-overlay");
+                var content = document.getElementById("request-detail-content");
+                if (overlay) {
+                    overlay.style.opacity = "0";
+                    setTimeout(function() { overlay.style.display = "none"; }, 200);
+                }
+                if (content) {
+                    content.style.opacity = "1";
+                }
+            }
+            window.showLoadingOverlay = showLoadingOverlay;
+            window.hideLoadingOverlay = hideLoadingOverlay;
+
             const { createApp } = Vue;
 
-            // Vue app for dashboard interactions
+            // Vue app for dashboard interactions (minimal - just for dropdown)
             const dashboardApp = createApp({
                 data() {
                     return {
-                        isLoading: false,
-                        selectedRequestId: null,
                         switchDropdownOpen: false,
                         endpointColor: null
                     }
@@ -157,16 +179,6 @@
                     {{ end }}
                 },
                 methods: {
-                    handleRequestClick(element) {
-                        const requestId = element ? element.getAttribute("data-request-id") : null;
-                        if(requestId) {
-                            this.selectedRequestId = parseInt(requestId);
-                            this.isLoading = true;
-                        }
-                    },
-                    handleRequestLoaded() {
-                        this.isLoading = false;
-                    },
                     toggleSwitchDropdown() {
                         this.switchDropdownOpen = !this.switchDropdownOpen;
                     },
@@ -174,7 +186,7 @@
                         return this.switchDropdownOpen ? "rotate-180" : "";
                     },
                     closeSwitchDropdown(event) {
-                        const container = document.getElementById("switch-container");
+                        var container = document.getElementById("switch-container");
                         if (container && !container.contains(event.target)) {
                             this.switchDropdownOpen = false;
                         }
@@ -184,32 +196,16 @@
                     // Close dropdown when clicking outside
                     document.addEventListener("click", this.closeSwitchDropdown);
 
-                    // Handle HTMX events for smooth transitions
-                    const self = this;
+                    // Handle HTMX events for smooth transitions (using plain DOM, not Vue state)
                     document.body.addEventListener("htmx:beforeRequest", function(e) {
                         if (e.detail.target && e.detail.target.id === "request-detail-content") {
-                            self.isLoading = true;
-                            const content = document.getElementById("request-detail-content");
-                            if (content) {
-                                content.style.opacity = "0.4";
-                            }
-                            // Extract request ID from the URL
-                            const url = e.detail.pathInfo ? e.detail.pathInfo.requestPath : e.detail.requestURL || "";
-                            const match = url.match(/\/r\/(\d+)/);
-                            if (match) {
-                                self.selectedRequestId = parseInt(match[1]);
-                            }
+                            showLoadingOverlay();
                         }
                     });
 
                     document.body.addEventListener("htmx:afterSwap", function(e) {
                         if (e.detail.target && e.detail.target.id === "request-detail-content") {
-                            // Always reset loading state first
-                            self.isLoading = false;
-                            var content = document.getElementById("request-detail-content");
-                            if (content) {
-                                content.style.opacity = "1";
-                            }
+                            hideLoadingOverlay();
                             // Initialize request detail (format JSON, update line numbers)
                             if (typeof initRequestDetail === "function") {
                                 initRequestDetail();
@@ -219,19 +215,11 @@
 
                     // Reset loading state on HTMX errors
                     document.body.addEventListener("htmx:responseError", function(e) {
-                        self.isLoading = false;
-                        var content = document.getElementById("request-detail-content");
-                        if (content) {
-                            content.style.opacity = "1";
-                        }
+                        hideLoadingOverlay();
                     });
 
                     document.body.addEventListener("htmx:sendError", function(e) {
-                        self.isLoading = false;
-                        var content = document.getElementById("request-detail-content");
-                        if (content) {
-                            content.style.opacity = "1";
-                        }
+                        hideLoadingOverlay();
                     });
                 },
                 beforeUnmount() {
