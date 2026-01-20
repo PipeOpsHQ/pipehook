@@ -210,22 +210,9 @@
                             if (content) {
                                 content.style.opacity = "1";
                             }
-
-                            // Execute scripts from swapped content
-                            var scriptContainer = e.detail.target.querySelector("[data-request-detail-script]");
-                            if (scriptContainer) {
-                                var scriptTag = scriptContainer.querySelector("script");
-                                if (scriptTag) {
-                                    var scriptContent = scriptTag.textContent || scriptTag.innerText;
-                                    try {
-                                        var newScript = document.createElement("script");
-                                        newScript.textContent = scriptContent;
-                                        document.body.appendChild(newScript);
-                                        document.body.removeChild(newScript);
-                                    } catch (err) {
-                                        console.error("Error executing request detail script:", err);
-                                    }
-                                }
+                            // Initialize request detail (format JSON, update line numbers)
+                            if (typeof initRequestDetail === "function") {
+                                initRequestDetail();
                             }
                         }
                     });
@@ -342,6 +329,203 @@
             }
             window.handleDeleteRequestFromList = handleDeleteRequestFromList;
 
+            // ============================================
+            // Request Detail Functions (from request-detail.html)
+            // ============================================
+
+            function setReplayUrl(button) {
+                var requestId = button ? button.getAttribute("data-request-id") : null;
+                if(requestId) {
+                    button.setAttribute("hx-post", "/r/" + requestId + "/replay");
+                }
+            }
+            window.setReplayUrl = setReplayUrl;
+
+            function handleReplayBefore(button) {
+                if(button) {
+                    button.classList.add("opacity-50", "pointer-events-none");
+                    var icon = button.querySelector("i");
+                    if(icon) icon.classList.add("animate-spin");
+                }
+            }
+            window.handleReplayBefore = handleReplayBefore;
+
+            function handleReplayAfter(button) {
+                if(button) {
+                    button.classList.remove("opacity-50", "pointer-events-none");
+                    var icon = button.querySelector("i");
+                    if(icon) icon.classList.remove("animate-spin");
+                }
+                if (typeof showToast === "function") {
+                    showToast("Request replayed", "success");
+                }
+            }
+            window.handleReplayAfter = handleReplayAfter;
+
+            function handleDeleteRequest(button) {
+                if(typeof event !== "undefined" && event.detail && event.detail.xhr && event.detail.xhr.status === 200) {
+                    var requestId = button.getAttribute("data-request-id");
+                    var endpointId = button.getAttribute("data-endpoint-id");
+                    if(requestId) {
+                        var selector = "[data-request-id=" + String.fromCharCode(34) + requestId + String.fromCharCode(34) + "]";
+                        var listItem = document.querySelector(selector);
+                        if(listItem) listItem.remove();
+                    }
+                    var count = document.getElementById("request-count");
+                    if(count) {
+                        var current = parseInt(count.innerText) || 0;
+                        count.innerText = Math.max(0, current - 1);
+                    }
+                    if(typeof showToast === "function") {
+                        showToast("Request deleted", "success");
+                    }
+                    if(endpointId) {
+                        window.location.href = "/" + endpointId;
+                    }
+                }
+            }
+            window.handleDeleteRequest = handleDeleteRequest;
+
+            function toggleSection(sectionId) {
+                var section = document.getElementById(sectionId);
+                var chevronId = sectionId.replace("-section", "-chevron");
+                var chevron = document.getElementById(chevronId);
+                if (section && chevron) {
+                    var isHidden = section.classList.contains("hidden");
+                    if (isHidden) {
+                        section.classList.remove("hidden");
+                        chevron.classList.remove("rotate-180");
+                    } else {
+                        section.classList.add("hidden");
+                        chevron.classList.add("rotate-180");
+                    }
+                }
+            }
+            window.toggleSection = toggleSection;
+
+            var headersViewMode = "json";
+
+            function toggleHeadersView() {
+                var jsonView = document.getElementById("headers-json-view");
+                var listView = document.getElementById("headers-list-view");
+                var toggleBtn = document.getElementById("headers-view-toggle");
+                if (!jsonView || !listView || !toggleBtn) return;
+                if (headersViewMode === "json") {
+                    jsonView.classList.add("hidden");
+                    listView.classList.remove("hidden");
+                    toggleBtn.innerHTML = "<i class=" + String.fromCharCode(34) + "fas fa-list-ul text-xs" + String.fromCharCode(34) + "></i>";
+                    headersViewMode = "list";
+                } else {
+                    jsonView.classList.remove("hidden");
+                    listView.classList.add("hidden");
+                    toggleBtn.innerHTML = "<i class=" + String.fromCharCode(34) + "fas fa-code text-xs" + String.fromCharCode(34) + "></i>";
+                    headersViewMode = "json";
+                }
+            }
+            window.toggleHeadersView = toggleHeadersView;
+
+            function copyHeaders() {
+                var jsonView = document.getElementById("headers-json-view");
+                var listView = document.getElementById("headers-list-view");
+                var activeView = headersViewMode === "json" ? jsonView : listView;
+                if (!activeView) return;
+                var text = activeView.innerText || activeView.textContent || "";
+                navigator.clipboard.writeText(text).then(function() {
+                    if (typeof showToast === "function") {
+                        showToast("Headers copied", "success");
+                    }
+                }).catch(function() {
+                    if (typeof showToast === "function") {
+                        showToast("Failed to copy", "error");
+                    }
+                });
+            }
+            window.copyHeaders = copyHeaders;
+
+            function copyBody() {
+                var bodyRaw = document.getElementById("body-raw");
+                if (!bodyRaw) {
+                    if (typeof showToast === "function") {
+                        showToast("Cannot copy binary content", "info");
+                    }
+                    return;
+                }
+                var text = bodyRaw.innerText || bodyRaw.textContent || "";
+                navigator.clipboard.writeText(text).then(function() {
+                    if (typeof showToast === "function") {
+                        showToast("Body copied", "success");
+                    }
+                }).catch(function() {
+                    if (typeof showToast === "function") {
+                        showToast("Failed to copy", "error");
+                    }
+                });
+            }
+            window.copyBody = copyBody;
+
+            function formatBody() {
+                var bodyRaw = document.getElementById("body-raw");
+                var lineNumbers = document.getElementById("line-numbers");
+                if (!bodyRaw) return;
+                var text = bodyRaw.textContent || bodyRaw.innerText || "";
+                if (!text.trim()) return;
+                try {
+                    var json = JSON.parse(text);
+                    var formatted = JSON.stringify(json, null, 2);
+                    bodyRaw.textContent = formatted;
+                    updateLineNumbers(bodyRaw, lineNumbers);
+                    if (typeof showToast === "function") {
+                        showToast("JSON formatted", "success");
+                    }
+                } catch (e) {
+                    if (typeof showToast === "function") {
+                        showToast("Not valid JSON", "error");
+                    }
+                }
+            }
+            window.formatBody = formatBody;
+
+            function updateLineNumbers(bodyRaw, lineNumbers) {
+                if (!bodyRaw || !lineNumbers) return;
+                var text = bodyRaw.innerText || bodyRaw.textContent || "";
+                var lines = text.split("\n");
+                var html = "";
+                for (var i = 0; i < lines.length; i++) {
+                    html += "<div class=" + String.fromCharCode(34) + "leading-relaxed" + String.fromCharCode(34) + ">" + (i + 1) + "</div>";
+                }
+                lineNumbers.innerHTML = html;
+            }
+
+            function initRequestDetail() {
+                var bodyRaw = document.getElementById("body-raw");
+                var lineNumbers = document.getElementById("line-numbers");
+                if (bodyRaw && lineNumbers) {
+                    var text = bodyRaw.textContent || bodyRaw.innerText || "";
+                    if (text.trim()) {
+                        try {
+                            var json = JSON.parse(text);
+                            var formatted = JSON.stringify(json, null, 2);
+                            bodyRaw.textContent = formatted;
+                        } catch (e) {}
+                    }
+                    updateLineNumbers(bodyRaw, lineNumbers);
+                }
+                // Update headers line numbers too
+                var headersRaw = document.getElementById("headers-raw");
+                var headersLineNumbers = document.getElementById("headers-line-numbers");
+                if (headersRaw && headersLineNumbers) {
+                    updateLineNumbers(headersRaw, headersLineNumbers);
+                }
+            }
+            window.initRequestDetail = initRequestDetail;
+
+            // Initialize on page load if detail content exists
+            initRequestDetail();
+
+            // ============================================
+            // End Request Detail Functions
+            // ============================================
+
             // Apply colors to request items and dropdown after Vue is mounted
             function applyEndpointColors() {
                 document.querySelectorAll("[data-endpoint-id]").forEach(el => {
@@ -452,7 +636,7 @@
              hx-target="#request-detail-content"
              hx-swap="innerHTML"
              hx-on::before-request="setRequestDetailUrl(this)"
-             onclick="handleRequestClick(this)">
+             onclick="handleRequestItemClick(this)">
             <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-1.5">
                     <div class="endpoint-color-dot w-1.5 h-1.5 rounded-full shrink-0" data-endpoint-id="{{ .EndpointID }}"></div>
