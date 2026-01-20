@@ -130,28 +130,29 @@
                 mounted() {
                     // Set endpoint color on mount and apply to header
                     {{ if .Endpoint }}
-                    const endpointIdElement = document.getElementById("endpoint-header");
+                    var endpointIdElement = document.getElementById("endpoint-header");
                     if(endpointIdElement && typeof getEndpointColor === "function") {
-                        const endpointId = endpointIdElement.getAttribute("data-endpoint-id");
+                        var endpointId = endpointIdElement.getAttribute("data-endpoint-id");
                         if(endpointId) {
                             this.endpointColor = getEndpointColor(endpointId);
                             if (this.endpointColor) {
-                        const header = document.getElementById("endpoint-header");
-                        const dot = document.getElementById("endpoint-color-dot");
-                        const url = document.getElementById("endpoint-url");
-                        if (header) {
-                            header.classList.add("border-l-4", this.endpointColor.border);
-                            header.classList.remove("border-slate-800");
+                                var header = document.getElementById("endpoint-header");
+                                var dot = document.getElementById("endpoint-color-dot");
+                                var url = document.getElementById("endpoint-url");
+                                if (header) {
+                                    header.classList.add("border-l-4", this.endpointColor.border);
+                                    header.classList.remove("border-slate-800");
+                                }
+                                if (dot) {
+                                    dot.classList.remove("bg-brand-500");
+                                    dot.classList.add(this.endpointColor.accent);
+                                }
+                                if (url) {
+                                    url.classList.remove("text-brand-400");
+                                    url.classList.add(this.endpointColor.text);
+                                }
+                            }
                         }
-                        if (dot) {
-                            dot.classList.remove("bg-brand-500");
-                            dot.classList.add(this.endpointColor.accent);
-                        }
-                        if (url) {
-                            url.classList.remove("text-brand-400");
-                            url.classList.add(this.endpointColor.text);
-                        }
-                    }
                     }
                     {{ end }}
                 },
@@ -203,31 +204,46 @@
 
                     document.body.addEventListener("htmx:afterSwap", function(e) {
                         if (e.detail.target && e.detail.target.id === "request-detail-content") {
-                            setTimeout(() => {
-                                self.isLoading = false;
-                                const content = document.getElementById("request-detail-content");
-                                if (content) {
-                                    content.style.opacity = "1";
-                                }
-                            }, 150);
+                            // Always reset loading state first
+                            self.isLoading = false;
+                            var content = document.getElementById("request-detail-content");
+                            if (content) {
+                                content.style.opacity = "1";
+                            }
 
-                            // Execute scripts from swapped content (extract from data attribute to avoid Vue compilation issues)
-                            const scriptContainer = e.detail.target.querySelector("[data-request-detail-script]");
+                            // Execute scripts from swapped content
+                            var scriptContainer = e.detail.target.querySelector("[data-request-detail-script]");
                             if (scriptContainer) {
-                                const scriptTag = scriptContainer.querySelector("script[type="text/plain"]");
+                                var scriptTag = scriptContainer.querySelector("script");
                                 if (scriptTag) {
-                                    const scriptContent = scriptTag.textContent || scriptTag.innerText;
+                                    var scriptContent = scriptTag.textContent || scriptTag.innerText;
                                     try {
-                                        // Create and execute script in global scope
-                                        const script = document.createElement("script");
-                                        script.textContent = scriptContent;
-                                        document.body.appendChild(script);
-                                        document.body.removeChild(script);
+                                        var newScript = document.createElement("script");
+                                        newScript.textContent = scriptContent;
+                                        document.body.appendChild(newScript);
+                                        document.body.removeChild(newScript);
                                     } catch (err) {
                                         console.error("Error executing request detail script:", err);
                                     }
                                 }
                             }
+                        }
+                    });
+
+                    // Reset loading state on HTMX errors
+                    document.body.addEventListener("htmx:responseError", function(e) {
+                        self.isLoading = false;
+                        var content = document.getElementById("request-detail-content");
+                        if (content) {
+                            content.style.opacity = "1";
+                        }
+                    });
+
+                    document.body.addEventListener("htmx:sendError", function(e) {
+                        self.isLoading = false;
+                        var content = document.getElementById("request-detail-content");
+                        if (content) {
+                            content.style.opacity = "1";
                         }
                     });
                 },
