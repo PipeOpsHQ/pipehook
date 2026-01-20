@@ -10,8 +10,8 @@
             <button class="text-[10px] font-bold text-white bg-brand-600 hover:bg-brand-500 px-2.5 py-1 rounded-md transition-all active:scale-95 flex items-center gap-1.5 shadow-lg shadow-brand-600/5"
                     hx-post="/r/{{ .ID }}/replay"
                     hx-swap="none"
-                    hx-on::before-request="this.classList.add('opacity-50', 'pointer-events-none'); this.querySelector('i').classList.add('animate-spin')"
-                    hx-on::after-request="this.classList.remove('opacity-50', 'pointer-events-none'); this.querySelector('i').classList.remove('animate-spin')">
+                    hx-on::before-request="handleReplayBefore(this)"
+                    hx-on::after-request="handleReplayAfter(this)">
                 <i class="fas fa-repeat text-[9px]"></i>
                 Replay
             </button>
@@ -114,6 +114,24 @@
     <div data-request-detail-script style="display: none;">
         <script type="text/plain">
         (function() {
+            function handleReplayBefore(button) {
+                if(button) {
+                    button.classList.add('opacity-50', 'pointer-events-none');
+                    const icon = button.querySelector('i');
+                    if(icon) icon.classList.add('animate-spin');
+                }
+            }
+            window.handleReplayBefore = handleReplayBefore;
+
+            function handleReplayAfter(button) {
+                if(button) {
+                    button.classList.remove('opacity-50', 'pointer-events-none');
+                    const icon = button.querySelector('i');
+                    if(icon) icon.classList.remove('animate-spin');
+                }
+            }
+            window.handleReplayAfter = handleReplayAfter;
+
             function handleDeleteRequest(button) {
                 // HTMX provides event as a global variable
                 if(typeof event !== 'undefined' && event.detail && event.detail.xhr && event.detail.xhr.status === 200) {
