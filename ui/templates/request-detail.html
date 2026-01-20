@@ -21,7 +21,7 @@
                     hx-swap="none"
                     data-request-id="{{ .ID }}"
                     data-endpoint-id="{{ .EndpointID }}"
-                    hx-on::after-request="if(event.detail.xhr.status === 200) { const listItem = document.querySelector('[data-request-id=&quot;{{ .ID }}&quot;]'); if(listItem) listItem.remove(); const count = document.getElementById('request-count'); if(count) { const current = parseInt(count.innerText) || 0; count.innerText = Math.max(0, current - 1); } window.location.href = '/{{ .EndpointID }}'; }">
+                    hx-on::after-request="handleDeleteRequest(this)">
                 <i class="fas fa-trash-can text-[9px]"></i>
                 Delete
             </button>
@@ -114,6 +114,27 @@
     <div data-request-detail-script style="display: none;">
         <script type="text/plain">
         (function() {
+            function handleDeleteRequest(button) {
+                // HTMX provides event as a global variable
+                if(typeof event !== 'undefined' && event.detail && event.detail.xhr && event.detail.xhr.status === 200) {
+                    const requestId = button.getAttribute('data-request-id');
+                    const endpointId = button.getAttribute('data-endpoint-id');
+                    if(requestId) {
+                        const listItem = document.querySelector('[data-request-id="' + requestId + '"]');
+                        if(listItem) listItem.remove();
+                    }
+                    const count = document.getElementById('request-count');
+                    if(count) {
+                        const current = parseInt(count.innerText) || 0;
+                        count.innerText = Math.max(0, current - 1);
+                    }
+                    if(endpointId) {
+                        window.location.href = '/' + endpointId;
+                    }
+                }
+            }
+            window.handleDeleteRequest = handleDeleteRequest;
+
             function toggleSection(sectionId) {
                 const section = document.getElementById(sectionId);
                 const chevron = document.getElementById(sectionId.replace('-section', '-chevron'));
