@@ -342,8 +342,9 @@
                                 el.classList.add(color.border);
                             }
                             // Apply dot color
-                            const dot = el.querySelector(".endpoint-color-dot[data-endpoint-id=\"" + endpointId + "\"]") ||
-                                       el.querySelector(".switch-endpoint-dot[data-endpoint-id=\"" + endpointId + "\"]");
+                            var dotSelector1 = ".endpoint-color-dot[data-endpoint-id=" + String.fromCharCode(34) + endpointId + String.fromCharCode(34) + "]";
+                            var dotSelector2 = ".switch-endpoint-dot[data-endpoint-id=" + String.fromCharCode(34) + endpointId + String.fromCharCode(34) + "]";
+                            var dot = el.querySelector(dotSelector1) || el.querySelector(dotSelector2);
                             if (dot) {
                                 dot.classList.add(color.accent);
                             }

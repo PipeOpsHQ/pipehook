@@ -90,8 +90,8 @@
                 list.innerHTML = "";
                 recents.forEach(id => {
                     const item = document.createElement("a");
-                    item.href = '/' + id;
-                    item.className = 'block px-4 py-2 text-[10px] font-mono text-slate-400 hover:text-white hover:bg-slate-800 truncate';
+                    item.href = "/" + id;
+                    item.className = "block px-4 py-2 text-[10px] font-mono text-slate-400 hover:text-white hover:bg-slate-800 truncate";
                     item.innerText = id;
                     list.appendChild(item);
                 });
@@ -142,21 +142,21 @@
 
             // Use a curated palette of vibrant colors that work well in dark mode
             const colors = [
-                { bg: 'bg-blue-500/20', border: 'border-blue-500', text: 'text-blue-400', accent: 'bg-blue-500' },
-                { bg: 'bg-purple-500/20', border: 'border-purple-500', text: 'text-purple-400', accent: 'bg-purple-500' },
-                { bg: 'bg-pink-500/20', border: 'border-pink-500', text: 'text-pink-400', accent: 'bg-pink-500' },
-                { bg: 'bg-rose-500/20', border: 'border-rose-500', text: 'text-rose-400', accent: 'bg-rose-500' },
-                { bg: 'bg-orange-500/20', border: 'border-orange-500', text: 'text-orange-400', accent: 'bg-orange-500' },
-                { bg: 'bg-amber-500/20', border: 'border-amber-500', text: 'text-amber-400', accent: 'bg-amber-500' },
-                { bg: 'bg-yellow-500/20', border: 'border-yellow-500', text: 'text-yellow-400', accent: 'bg-yellow-500' },
-                { bg: 'bg-lime-500/20', border: 'border-lime-500', text: 'text-lime-400', accent: 'bg-lime-500' },
-                { bg: 'bg-green-500/20', border: 'border-green-500', text: 'text-green-400', accent: 'bg-green-500' },
-                { bg: 'bg-emerald-500/20', border: 'border-emerald-500', text: 'text-emerald-400', accent: 'bg-emerald-500' },
-                { bg: 'bg-teal-500/20', border: 'border-teal-500', text: 'text-teal-400', accent: 'bg-teal-500' },
-                { bg: 'bg-cyan-500/20', border: 'border-cyan-500', text: 'text-cyan-400', accent: 'bg-cyan-500' },
-                { bg: 'bg-indigo-500/20', border: 'border-indigo-500', text: 'text-indigo-400', accent: 'bg-indigo-500' },
-                { bg: 'bg-violet-500/20', border: 'border-violet-500', text: 'text-violet-400', accent: 'bg-violet-500' },
-                { bg: 'bg-fuchsia-500/20', border: 'border-fuchsia-500', text: 'text-fuchsia-400', accent: 'bg-fuchsia-500' },
+                { bg: "bg-blue-500/20", border: "border-blue-500", text: "text-blue-400", accent: "bg-blue-500" },
+                { bg: "bg-purple-500/20", border: "border-purple-500", text: "text-purple-400", accent: "bg-purple-500" },
+                { bg: "bg-pink-500/20", border: "border-pink-500", text: "text-pink-400", accent: "bg-pink-500" },
+                { bg: "bg-rose-500/20", border: "border-rose-500", text: "text-rose-400", accent: "bg-rose-500" },
+                { bg: "bg-orange-500/20", border: "border-orange-500", text: "text-orange-400", accent: "bg-orange-500" },
+                { bg: "bg-amber-500/20", border: "border-amber-500", text: "text-amber-400", accent: "bg-amber-500" },
+                { bg: "bg-yellow-500/20", border: "border-yellow-500", text: "text-yellow-400", accent: "bg-yellow-500" },
+                { bg: "bg-lime-500/20", border: "border-lime-500", text: "text-lime-400", accent: "bg-lime-500" },
+                { bg: "bg-green-500/20", border: "border-green-500", text: "text-green-400", accent: "bg-green-500" },
+                { bg: "bg-emerald-500/20", border: "border-emerald-500", text: "text-emerald-400", accent: "bg-emerald-500" },
+                { bg: "bg-teal-500/20", border: "border-teal-500", text: "text-teal-400", accent: "bg-teal-500" },
+                { bg: "bg-cyan-500/20", border: "border-cyan-500", text: "text-cyan-400", accent: "bg-cyan-500" },
+                { bg: "bg-indigo-500/20", border: "border-indigo-500", text: "text-indigo-400", accent: "bg-indigo-500" },
+                { bg: "bg-violet-500/20", border: "border-violet-500", text: "text-violet-400", accent: "bg-violet-500" },
+                { bg: "bg-fuchsia-500/20", border: "border-fuchsia-500", text: "text-fuchsia-400", accent: "bg-fuchsia-500" },
             ];
 
             const index = Math.abs(hash) % colors.length;
@@ -198,40 +198,42 @@
     <div id="notifications" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
 
     <script>
-        window.addEventListener('DOMContentLoaded', () => {
+        window.addEventListener("DOMContentLoaded", function() {
             updateHeaderRecents();
             updateRelativeTimes();
         });
 
         // Custom toast notification system
-        function showToast(message, type = 'info', duration = 3000) {
+        function showToast(message, type, duration) {
+            type = type || "info";
+            duration = duration || 3000;
             const notifications = document.getElementById("notifications");
             if (!notifications) return;
 
             const toast = document.createElement("div");
-            toast.className = 'px-4 py-3 rounded-lg shadow-xl text-xs font-bold flex items-center gap-2 min-w-[280px] max-w-md transform transition-all duration-300 translate-x-full opacity-0';
+            toast.className = "px-4 py-3 rounded-lg shadow-xl text-xs font-bold flex items-center gap-2 min-w-[280px] max-w-md transform transition-all duration-300 translate-x-full opacity-0";
 
             // Set colors and icons based on type
             const configs = {
                 success: {
-                    bg: 'bg-emerald-600',
-                    text: 'text-white',
-                    icon: 'fa-check-circle'
+                    bg: "bg-emerald-600",
+                    text: "text-white",
+                    icon: "fa-check-circle"
                 },
                 error: {
-                    bg: 'bg-red-600',
-                    text: 'text-white',
-                    icon: 'fa-exclamation-circle'
+                    bg: "bg-red-600",
+                    text: "text-white",
+                    icon: "fa-exclamation-circle"
                 },
                 warning: {
-                    bg: 'bg-yellow-600',
-                    text: 'text-white',
-                    icon: 'fa-exclamation-triangle'
+                    bg: "bg-yellow-600",
+                    text: "text-white",
+                    icon: "fa-exclamation-triangle"
                 },
                 info: {
-                    bg: 'bg-brand-600',
-                    text: 'text-white',
-                    icon: 'fa-info-circle'
+                    bg: "bg-brand-600",
+                    text: "text-white",
+                    icon: "fa-info-circle"
                 }
             };
 
@@ -243,12 +245,12 @@
 
             // Trigger animation
             requestAnimationFrame(() => {
-                toast.classList.remove('translate-x-full', 'opacity-0');
+                toast.classList.remove("translate-x-full", "opacity-0");
             });
 
             // Auto remove after duration
             setTimeout(() => {
-                toast.classList.add('translate-x-full', 'opacity-0');
+                toast.classList.add("translate-x-full", "opacity-0");
                 setTimeout(() => toast.remove(), 300);
             }, duration);
         }
@@ -257,8 +259,8 @@
         window.showToast = showToast;
 
         // Handle request replayed event
-        document.body.addEventListener('requestReplayed', function(evt) {
-            showToast("Request replayed successfully", 'success');
+        document.body.addEventListener("requestReplayed", function(evt) {
+            showToast("Request replayed successfully", "success");
         });
     </script>
 </body>

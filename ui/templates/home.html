@@ -57,21 +57,21 @@
 
 <script>
     // Apply endpoint colors on home page
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.home-endpoint-item').forEach(item => {
-            const endpointId = item.getAttribute('data-endpoint-id');
-            if (endpointId && typeof getEndpointColor === 'function') {
+    document.addEventListener("DOMContentLoaded", function() {
+        document.querySelectorAll(".home-endpoint-item").forEach(function(item) {
+            var endpointId = item.getAttribute("data-endpoint-id");
+            if (endpointId && typeof getEndpointColor === "function") {
                 const color = getEndpointColor(endpointId);
                 if (color) {
                     item.classList.add(color.border);
-                    const dot = item.querySelector('.home-endpoint-dot[data-endpoint-id="' + endpointId + '"]');
-                    const icon = item.querySelector('.home-endpoint-icon[data-endpoint-id="' + endpointId + '"]');
-                    const text = item.querySelector('.home-endpoint-text[data-endpoint-id="' + endpointId + '"]');
+                    var dotSel = ".home-endpoint-dot[data-endpoint-id=" + String.fromCharCode(34) + endpointId + String.fromCharCode(34) + "]"; var dot = item.querySelector(dotSel);
+                    var iconSel = ".home-endpoint-icon[data-endpoint-id=" + String.fromCharCode(34) + endpointId + String.fromCharCode(34) + "]"; var icon = item.querySelector(iconSel);
+                    var textSel = ".home-endpoint-text[data-endpoint-id=" + String.fromCharCode(34) + endpointId + String.fromCharCode(34) + "]"; var text = item.querySelector(textSel);
                     if (dot) {
                         dot.classList.add(color.accent);
                     }
                     if (icon) {
-                        icon.classList.add(color.bg, 'border', color.border);
+                        icon.classList.add(color.bg, "border", color.border);
                     }
                     if (text) {
                         text.classList.add(color.text);

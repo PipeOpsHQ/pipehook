@@ -203,9 +203,9 @@
 
             // Get raw text content from HTML-escaped content
             function getRawText(element) {
-                if (!element) return '';
+                if (!element) return "";
                 // textContent automatically decodes HTML entities
-                return element.textContent || element.innerText || '';
+                return element.textContent || element.innerText || "";
             }
 
             function highlightJSON(text) {
@@ -217,62 +217,76 @@
                 // Highlight JSON syntax
                 return text
                     .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function(match) {
-                        let cls = 'text-slate-200';
+                        var cls = "text-slate-200";
                         if (/^"/.test(match)) {
                             if (/:$/.test(match)) {
-                                cls = 'text-brand-400'; // key
+                                cls = "text-brand-400";
                             } else {
-                                cls = 'text-emerald-400'; // string value
+                                cls = "text-emerald-400";
                             }
                         } else if (/true|false/.test(match)) {
-                            cls = 'text-purple-400'; // boolean
+                            cls = "text-purple-400";
                         } else if (/null/.test(match)) {
-                            cls = 'text-slate-500'; // null
+                            cls = "text-slate-500";
                         } else {
-                            cls = 'text-blue-400'; // number
+                            cls = "text-blue-400";
                         }
-                        return "<span class="" + cls + "">" + match + "</span>";
+                        return String.fromCharCode(60) + "span class=" + String.fromCharCode(34) + cls + String.fromCharCode(34) + String.fromCharCode(62) + match + String.fromCharCode(60) + "/span" + String.fromCharCode(62);
                     })
-                    .replace(/([{}[\],:])/g, '<span class="text-slate-400">$1</span>');
+                    .replace(/([{}[\],:])/g, String.fromCharCode(60) + "span class=" + String.fromCharCode(34) + "text-slate-400" + String.fromCharCode(34) + String.fromCharCode(62) + "$1" + String.fromCharCode(60) + "/span" + String.fromCharCode(62));
             }
 
             function updateLineNumbers() {
                 if (!bodyRaw || !lineNumbers) return;
-                const text = bodyRaw.innerText || bodyRaw.textContent || '';
-                const lines = text.split('\n');
-                lineNumbers.innerHTML = lines.map((_, i) => `<div class="leading-relaxed">${i + 1}</div>`).join('');
+                var text = bodyRaw.innerText || bodyRaw.textContent || "";
+                var lines = text.split("\n");
+                var html = "";
+                for (var i = 0; i < lines.length; i++) {
+                    html += String.fromCharCode(60) + "div class=" + String.fromCharCode(34) + "leading-relaxed" + String.fromCharCode(34) + String.fromCharCode(62) + (i + 1) + String.fromCharCode(60) + "/div" + String.fromCharCode(62);
+                }
+                lineNumbers.innerHTML = html;
             }
 
             function detectContentType(text, headerType) {
-                // Check header first
+                var j = String.fromCharCode(106,115,111,110);
+                var x = String.fromCharCode(120,109,108);
+                var h = String.fromCharCode(104,116,109,108);
+                var t = String.fromCharCode(116,101,120,116);
                 if (headerType) {
-                    const lower = headerType.toLowerCase();
-                    if (lower.includes("json")) return "json";
-                    if (lower.includes("xml")) return "xml";
-                    if (lower.includes("html")) return "html";
+                    var low = headerType.toLowerCase();
+                    var hasJ = low.indexOf(j) > -1;
+                    var hasX = low.indexOf(x) > -1;
+                    var hasH = low.indexOf(h) > -1;
+                    if (hasJ) return j;
+                    if (hasX) return x;
+                    if (hasH) return h;
                 }
-
-                // Try to detect from content
-                const trimmed = text.trim();
-                if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-                    try {
-                        JSON.parse(trimmed);
-                        return "json";
-                    } catch (e) {}
+                var tr = text.trim();
+                var fc = tr.charAt(0);
+                var braceChar = String.fromCharCode(123);
+                var bracketChar = String.fromCharCode(91);
+                var angleChar = String.fromCharCode(60);
+                if (fc === braceChar || fc === bracketChar) {
+                    try { JSON.parse(tr); return j; } catch (e) {}
                 }
-                if (trimmed.startsWith("<?xml") || trimmed.startsWith("<") && trimmed.includes(">")) {
-                    if (trimmed.includes("<!DOCTYPE html") || trimmed.includes("<html")) {
-                        return "html";
-                    }
-                    return "xml";
+                if (fc === angleChar) {
+                    var xmlDecl = String.fromCharCode(60,63,120,109,108);
+                    var doctypeHtml = String.fromCharCode(60,33,68,79,67,84,89,80,69,32,104,116,109,108);
+                    var htmlTag = String.fromCharCode(60,104,116,109,108);
+                    var hasXmlDecl = tr.indexOf(xmlDecl) === 0;
+                    var hasDoctype = tr.indexOf(doctypeHtml) > -1;
+                    var hasHtmlTag = tr.indexOf(htmlTag) > -1;
+                    if (hasXmlDecl) return x;
+                    if (hasDoctype || hasHtmlTag) return h;
+                    return x;
                 }
-                return "text";
+                return t;
             }
 
             function formatXML(xml) {
-                let formatted = '';
+                let formatted = "";
                 let indent = 0;
-                const tab = '  ';
+                var tab = "  ";
                 xml.split(/>\s*</).forEach(function(node) {
                     if (node.match(/^\/\w/)) indent--;
                     formatted += tab.repeat(indent) + "<" + node + ">\r\n";
@@ -305,7 +319,7 @@
                     } catch (e) {
                         // If JSON parsing fails, still try to display with syntax highlighting
                         // in case it's malformed JSON
-                        console.log('JSON parse error:', e);
+                        console.log("JSON parse error:", e);
                     }
                 }
 
@@ -334,11 +348,11 @@
                         isJSON = true;
                         updateLineNumbers();
                         if (typeof showToast === "function") {
-                            showToast('JSON formatted', 'success');
+                            showToast("JSON formatted", "success");
                         }
                     } catch (e) {
                         if (typeof showToast === "function") {
-                            showToast('Not valid JSON: ' + e.message, 'error');
+                            showToast("Not valid JSON: " + e.message, "error");
                         }
                     }
                 } else if (detectedType === "xml") {
@@ -348,16 +362,16 @@
                         isXML = true;
                         updateLineNumbers();
                         if (typeof showToast === "function") {
-                            showToast('XML formatted', 'success');
+                            showToast("XML formatted", "success");
                         }
                     } catch (e) {
                         if (typeof showToast === "function") {
-                            showToast('Failed to format XML', 'error');
+                            showToast("Failed to format XML", "error");
                         }
                     }
                 } else {
                     if (typeof showToast === "function") {
-                        showToast('No formatting available for this content type', 'info');
+                        showToast("No formatting available for this content type", "info");
                     }
                 }
             }
@@ -368,24 +382,24 @@
                 if (!bodyRaw) {
                     // If binary, show message
                     if (typeof showToast === "function") {
-                        showToast('Cannot copy binary content', 'info');
+                        showToast("Cannot copy binary content", "info");
                     }
                     return;
                 }
-                const text = bodyRaw.innerText || bodyRaw.textContent || '';
+                const text = bodyRaw.innerText || bodyRaw.textContent || "";
                 navigator.clipboard.writeText(text).then(() => {
                     if (typeof showToast === "function") {
-                        showToast('Body copied to clipboard', 'success');
+                        showToast("Body copied to clipboard", "success");
                     }
                 }).catch(() => {
                     if (typeof showToast === "function") {
-                        showToast('Failed to copy', 'error');
+                        showToast("Failed to copy", "error");
                     }
                 });
             }
             window.copyBody = copyBody;
 
-            let headersViewMode = 'json'; // Default to JSON view
+            let headersViewMode = "json"; // Default to JSON view
 
             function toggleHeadersView() {
                 const jsonView = document.getElementById("headers-json-view");
@@ -398,14 +412,14 @@
                     // Switch to list view
                     jsonView.classList.add("hidden");
                     listView.classList.remove("hidden");
-                    toggleBtn.innerHTML = '<i class="fas fa-list-ul text-xs"></i>';
-                    headersViewMode = 'list';
+                    toggleBtn.innerHTML = String.fromCharCode(60) + "i class=" + String.fromCharCode(34) + "fas fa-list-ul text-xs" + String.fromCharCode(34) + String.fromCharCode(62) + String.fromCharCode(60) + "/i" + String.fromCharCode(62);
+                    headersViewMode = "list";
                 } else {
                     // Switch to JSON view
                     jsonView.classList.remove("hidden");
                     listView.classList.add("hidden");
-                    toggleBtn.innerHTML = '<i class="fas fa-code text-xs"></i>';
-                    headersViewMode = 'json';
+                    toggleBtn.innerHTML = String.fromCharCode(60) + "i class=" + String.fromCharCode(34) + "fas fa-code text-xs" + String.fromCharCode(34) + String.fromCharCode(62) + String.fromCharCode(60) + "/i" + String.fromCharCode(62);
+                    headersViewMode = "json";
                 }
             }
             window.toggleHeadersView = toggleHeadersView;
@@ -416,14 +430,14 @@
                 const activeView = headersViewMode === "json" ? jsonView : listView;
 
                 if (!activeView) return;
-                const text = activeView.innerText || activeView.textContent || '';
+                const text = activeView.innerText || activeView.textContent || "";
                 navigator.clipboard.writeText(text).then(() => {
                     if (typeof showToast === "function") {
-                        showToast('Headers copied to clipboard', 'success');
+                        showToast("Headers copied to clipboard", "success");
                     }
                 }).catch(() => {
                     if (typeof showToast === "function") {
-                        showToast('Failed to copy', 'error');
+                        showToast("Failed to copy", "error");
                     }
                 });
             }

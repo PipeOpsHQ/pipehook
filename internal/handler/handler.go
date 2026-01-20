@@ -2,9 +2,9 @@ package handler
 
 import (
 	"bytes"
-	"html/template"
 	"net/http"
 	"sync"
+	"text/template"
 
 	"github.com/PipeOpsHQ/pipehook/internal/store"
 	"github.com/PipeOpsHQ/pipehook/ui"
