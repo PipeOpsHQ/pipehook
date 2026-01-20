@@ -94,7 +94,7 @@
                 </div>
             </transition>
             <!-- Content wrapper -->
-            <div id="request-detail-content" :class="{ 'opacity-40': isLoading }" class="flex-1 overflow-hidden flex flex-col transition-opacity duration-200 ease-in-out">
+            <div id="request-detail-content" class="flex-1 overflow-hidden flex flex-col transition-opacity duration-200 ease-in-out">
                 {{ if .FirstRequest }}
                     {{ template "request-detail" .FirstRequest }}
                 {{ else }}
@@ -175,6 +175,10 @@
                     document.body.addEventListener('htmx:beforeRequest', function(e) {
                         if (e.detail.target && e.detail.target.id === 'request-detail-content') {
                             self.isLoading = true;
+                            const content = document.getElementById('request-detail-content');
+                            if (content) {
+                                content.style.opacity = '0.4';
+                            }
                             // Extract request ID from the URL
                             const url = e.detail.pathInfo ? e.detail.pathInfo.requestPath : e.detail.requestURL || '';
                             const match = url.match(/\/r\/(\d+)/);
@@ -188,6 +192,10 @@
                         if (e.detail.target && e.detail.target.id === 'request-detail-content') {
                             setTimeout(() => {
                                 self.isLoading = false;
+                                const content = document.getElementById('request-detail-content');
+                                if (content) {
+                                    content.style.opacity = '1';
+                                }
                             }, 150);
 
                             // Execute scripts from swapped content (extract from data attribute to avoid Vue compilation issues)
