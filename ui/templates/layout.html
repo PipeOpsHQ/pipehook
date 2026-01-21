@@ -62,16 +62,42 @@
         }
 
         function updateRelativeTimes() {
-            document.querySelectorAll("[data-timestamp]").forEach(el => {
-                const timestamp = el.getAttribute("data-timestamp");
-                if (timestamp) {
-                    el.innerText = formatTimeAgo(timestamp);
+            // Only update visible timestamps (in viewport) for performance
+            var elements = document.querySelectorAll("[data-timestamp]");
+            var viewportHeight = window.innerHeight;
+            var updated = 0;
+            var maxUpdates = 50; // Limit updates per cycle
+
+            for (var i = 0; i < elements.length && updated < maxUpdates; i++) {
+                var el = elements[i];
+                var rect = el.getBoundingClientRect();
+                // Only update if element is in or near viewport
+                if (rect.top < viewportHeight + 200 && rect.bottom > -200) {
+                    var timestamp = el.getAttribute("data-timestamp");
+                    if (timestamp) {
+                        var newText = formatTimeAgo(timestamp);
+                        // Only update DOM if text changed
+                        if (el.innerText !== newText) {
+                            el.innerText = newText;
+                        }
+                        updated++;
+                    }
                 }
-            });
+            }
         }
 
-        // Run every 10 seconds
-        setInterval(updateRelativeTimes, 10000);
+        // Run every 30 seconds (less frequent, times don't change that fast)
+        var timeUpdateInterval = setInterval(updateRelativeTimes, 30000);
+
+        // Clean up interval when page is hidden to save resources
+        document.addEventListener("visibilitychange", function() {
+            if (document.hidden) {
+                clearInterval(timeUpdateInterval);
+            } else {
+                updateRelativeTimes();
+                timeUpdateInterval = setInterval(updateRelativeTimes, 30000);
+            }
+        });
 
         // Generate a consistent color for an endpoint ID
         function getEndpointColor(endpointId) {

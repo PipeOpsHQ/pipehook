@@ -539,38 +539,44 @@
             // End Request Detail Functions
             // ============================================
 
-            // Apply colors to request items and dropdown on page load
-            function applyEndpointColors() {
-                document.querySelectorAll("[data-endpoint-id]").forEach(el => {
-                    const endpointId = el.getAttribute("data-endpoint-id");
-                    if (endpointId) {
-                        const color = getEndpointColor(endpointId);
-                        if (color) {
-                            // Apply border color to list item
-                            if (el.tagName === "LI") {
-                                el.classList.add(color.border);
-                            }
-                            // Apply border color to dropdown items
-                            if (el.classList.contains("switch-endpoint-item")) {
-                                el.classList.add(color.border);
-                            }
-                            // Apply dot color
-                            var dotSelector1 = ".endpoint-color-dot[data-endpoint-id=" + String.fromCharCode(34) + endpointId + String.fromCharCode(34) + "]";
-                            var dotSelector2 = ".switch-endpoint-dot[data-endpoint-id=" + String.fromCharCode(34) + endpointId + String.fromCharCode(34) + "]";
-                            var dot = el.querySelector(dotSelector1) || el.querySelector(dotSelector2);
-                            if (dot) {
-                                dot.classList.add(color.accent);
-                            }
-                        }
+            // Apply colors to request items and dropdown - only unprocessed elements
+            function applyEndpointColors(container) {
+                var scope = container || document;
+                // Only process elements not yet colored (no data-colored attribute)
+                scope.querySelectorAll("[data-endpoint-id]:not([data-colored])").forEach(function(el) {
+                    var endpointId = el.getAttribute("data-endpoint-id");
+                    if (!endpointId) return;
+
+                    var color = getEndpointColor(endpointId);
+                    if (!color) return;
+
+                    // Mark as processed to avoid re-processing
+                    el.setAttribute("data-colored", "1");
+
+                    // Apply border color based on element type
+                    if (el.tagName === "LI" || el.classList.contains("switch-endpoint-item")) {
+                        el.classList.add(color.border);
+                    }
+
+                    // Apply dot color - simpler selector
+                    var dot = el.querySelector(".endpoint-color-dot, .switch-endpoint-dot");
+                    if (dot && !dot.hasAttribute("data-colored")) {
+                        dot.classList.add(color.accent);
+                        dot.setAttribute("data-colored", "1");
                     }
                 });
             }
 
-            setTimeout(applyEndpointColors, 100);
+            // Initial color application (deferred)
+            requestAnimationFrame(applyEndpointColors);
 
-            // Re-apply colors when dropdown opens (for dynamically added items)
-            document.body.addEventListener("htmx:afterSwap", function() {
-                setTimeout(applyEndpointColors, 50);
+            // Re-apply colors only to new content after HTMX swap
+            document.body.addEventListener("htmx:afterSwap", function(e) {
+                if (e.detail && e.detail.target) {
+                    requestAnimationFrame(function() {
+                        applyEndpointColors(e.detail.target);
+                    });
+                }
             });
 
             // WebSocket connection for real-time updates
@@ -583,33 +589,58 @@
                 const requestList = document.getElementById("request-list");
                 const requestCount = document.getElementById("request-count");
 
+                var MAX_DOM_ITEMS = 200; // Limit DOM elements to prevent memory bloat
+
                 ws.onmessage = function(event) {
-                    const data = JSON.parse(event.data);
+                    var data = JSON.parse(event.data);
                     if (data.type === "new-request") {
-                        // Create a temporary container to parse the HTML
-                        const temp = document.createElement("div");
+                        // Create element from HTML string
+                        var temp = document.createElement("div");
                         temp.innerHTML = data.payload;
-                        const newItem = temp.querySelector("li");
+                        var newItem = temp.firstElementChild;
 
                         if (newItem && requestList) {
+                            // Insert at top
                             requestList.insertBefore(newItem, requestList.firstChild);
 
-                            // Process HTMX attributes on the new element
+                            // Process HTMX attributes
                             if (typeof htmx !== "undefined") {
                                 htmx.process(newItem);
                             }
 
+                            // Apply color to new item only (not all items)
+                            var endpointId = newItem.getAttribute("data-endpoint-id");
+                            if (endpointId && typeof getEndpointColor === "function") {
+                                var color = getEndpointColor(endpointId);
+                                if (color) {
+                                    var dot = newItem.querySelector(".endpoint-color-dot");
+                                    if (dot) dot.classList.add(color.accent);
+                                }
+                            }
+
                             // Update count
                             if (requestCount) {
-                                const current = parseInt(requestCount.innerText) || 0;
+                                var current = parseInt(requestCount.innerText) || 0;
                                 requestCount.innerText = current + 1;
                             }
 
-                            // Update relative times for the new item
-                            if (typeof updateRelativeTimes === "function") {
-                                updateRelativeTimes();
+                            // Update time on new item only
+                            var timeEl = newItem.querySelector("[data-timestamp]");
+                            if (timeEl && typeof formatTimeAgo === "function") {
+                                var ts = timeEl.getAttribute("data-timestamp");
+                                if (ts) timeEl.innerText = formatTimeAgo(ts);
+                            }
+
+                            // Prune old items to prevent DOM bloat
+                            var items = requestList.querySelectorAll("li[data-request-id]");
+                            if (items.length > MAX_DOM_ITEMS) {
+                                for (var i = MAX_DOM_ITEMS; i < items.length; i++) {
+                                    items[i].remove();
+                                }
                             }
                         }
+                        // Clean up temp element
+                        temp = null;
                     }
                 };
 
@@ -618,37 +649,49 @@
                 };
 
                 ws.onclose = function() {
-                    // Connection closed - user can manually refresh if needed
                     console.log("WebSocket connection closed");
                 };
+
+                // Clean up WebSocket when leaving page
+                window.addEventListener("beforeunload", function() {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.close();
+                    }
+                });
+
+                // Pause updates when tab is hidden to save resources
+                document.addEventListener("visibilitychange", function() {
+                    if (document.hidden && ws && ws.readyState === WebSocket.OPEN) {
+                        // Could pause, but WebSocket is lightweight - just log
+                        console.log("Tab hidden, WebSocket still connected");
+                    }
+                });
             }
         })();
     </script>
 {{ end }}
 
 {{ define "request-item" }}
-<li class="group hover:bg-slate-800/40 cursor-pointer transition-all relative border-l-4 border-l-transparent active:bg-slate-800/60"
+<li class="group hover:bg-slate-800/40 cursor-pointer transition-all border-l-4 border-l-transparent"
     data-request-id="{{ .ID }}"
     data-endpoint-id="{{ .EndpointID }}"
+    hx-get="/r/{{ .ID }}"
+    hx-target="#request-detail-content"
+    hx-swap="innerHTML"
     onclick="handleRequestItemClick(this)">
-    <div class="px-4 py-4 flex items-start justify-between gap-3">
-        <div class="flex-1 min-w-0 cursor-pointer"
-             data-request-id="{{ .ID }}"
-             hx-get="/r/{{ .ID }}"
-             hx-target="#request-detail-content"
-             hx-swap="innerHTML">
-            <div class="flex items-center justify-between mb-2">
+    <div class="px-4 py-3 flex items-start justify-between gap-2">
+        <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between mb-1">
                 <div class="flex items-center gap-1.5">
-                    <div class="endpoint-color-dot w-1.5 h-1.5 rounded-full shrink-0" data-endpoint-id="{{ .EndpointID }}"></div>
-                    <span class="text-xs font-bold {{ if eq .Method "GET" }}text-emerald-500 bg-emerald-500/10 border-emerald-500/20{{ else }}text-brand-400 bg-brand-500/10 border-brand-500/20{{ end }} font-mono px-2 py-0.5 rounded border">{{ .Method }}</span>
+                    <span class="endpoint-color-dot w-1.5 h-1.5 rounded-full shrink-0"></span>
+                    <span class="text-xs font-bold {{ if eq .Method "GET" }}text-emerald-500{{ else }}text-brand-400{{ end }} font-mono">{{ .Method }}</span>
                 </div>
-                <span class="text-[10px] text-slate-500 font-mono tracking-tighter" data-timestamp="{{ .CreatedAt.Format "2006-01-02T15:04:05Z07:00" }}">{{ .CreatedAt.Format "15:04:05" }}</span>
+                <span class="text-[10px] text-slate-500 font-mono" data-timestamp="{{ .CreatedAt.Format "2006-01-02T15:04:05Z07:00" }}">{{ .CreatedAt.Format "15:04:05" }}</span>
             </div>
-            <p class="text-sm text-slate-300 font-mono truncate group-hover:text-white transition-colors">{{ .Path }}</p>
-            <p class="text-[10px] text-slate-600 font-mono mt-1.5 truncate">{{ .RemoteAddr }}</p>
+            <p class="text-xs text-slate-300 font-mono truncate">{{ .Path }}</p>
+            <p class="text-[10px] text-slate-600 font-mono truncate">{{ .RemoteAddr }}</p>
         </div>
-        <button class="opacity-0 group-hover:opacity-100 transition-opacity text-slate-600 hover:text-red-500 p-1.5 rounded hover:bg-slate-800/50"
-                data-request-id="{{ .ID }}"
+        <button class="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-500 p-1"
                 hx-delete="/r/{{ .ID }}"
                 hx-target="closest li"
                 hx-swap="outerHTML"
