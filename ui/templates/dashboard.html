@@ -541,14 +541,18 @@
 
             // Apply colors to request items and dropdown - only unprocessed elements
             function applyEndpointColors(container) {
-                var scope = container || document;
+                // Ensure we have a valid element with querySelectorAll
+                var scope = (container && typeof container.querySelectorAll === "function") ? container : document;
+
                 // Only process elements not yet colored (no data-colored attribute)
-                scope.querySelectorAll("[data-endpoint-id]:not([data-colored])").forEach(function(el) {
+                var elements = scope.querySelectorAll("[data-endpoint-id]:not([data-colored])");
+                for (var i = 0; i < elements.length; i++) {
+                    var el = elements[i];
                     var endpointId = el.getAttribute("data-endpoint-id");
-                    if (!endpointId) return;
+                    if (!endpointId) continue;
 
                     var color = getEndpointColor(endpointId);
-                    if (!color) return;
+                    if (!color) continue;
 
                     // Mark as processed to avoid re-processing
                     el.setAttribute("data-colored", "1");
@@ -558,25 +562,23 @@
                         el.classList.add(color.border);
                     }
 
-                    // Apply dot color - simpler selector
+                    // Apply dot color
                     var dot = el.querySelector(".endpoint-color-dot, .switch-endpoint-dot");
                     if (dot && !dot.hasAttribute("data-colored")) {
                         dot.classList.add(color.accent);
                         dot.setAttribute("data-colored", "1");
                     }
-                });
+                }
             }
 
             // Initial color application (deferred)
-            requestAnimationFrame(applyEndpointColors);
+            requestAnimationFrame(function() { applyEndpointColors(document); });
 
             // Re-apply colors only to new content after HTMX swap
             document.body.addEventListener("htmx:afterSwap", function(e) {
-                if (e.detail && e.detail.target) {
-                    requestAnimationFrame(function() {
-                        applyEndpointColors(e.detail.target);
-                    });
-                }
+                requestAnimationFrame(function() {
+                    applyEndpointColors(e.detail && e.detail.target ? e.detail.target : document);
+                });
             });
 
             // WebSocket connection for real-time updates
