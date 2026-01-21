@@ -14,7 +14,11 @@ import (
 )
 
 func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
-	endpoints, err := h.Store.ListEndpoints(r.Context(), 50)
+	// Get or create browser ID for this user
+	browserID := h.GetBrowserID(w, r)
+
+	// Only list endpoints created by this browser
+	endpoints, err := h.Store.ListEndpoints(r.Context(), browserID, 50)
 	if err != nil {
 		log.Printf("failed to list endpoints: %v", err)
 		endpoints = []*store.Endpoint{}
@@ -36,8 +40,11 @@ func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) CreateEndpoint(w http.ResponseWriter, r *http.Request) {
+	// Get or create browser ID for this user
+	browserID := h.GetBrowserID(w, r)
+
 	id := uuid.New().String()
-	_, err := h.Store.CreateEndpoint(r.Context(), id, "", 24*time.Hour)
+	_, err := h.Store.CreateEndpoint(r.Context(), id, "", browserID, 24*time.Hour)
 	if err != nil {
 		http.Error(w, "failed to create endpoint", http.StatusInternalServerError)
 		return
@@ -53,6 +60,9 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 		}
 	}()
+
+	// Get browser ID for this user
+	browserID := h.GetBrowserID(w, r)
 
 	endpointID := chi.URLParam(r, "endpointID")
 	if endpointID == "" {
@@ -82,8 +92,8 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get other endpoints for switching
-	allEndpoints, _ := h.Store.ListEndpoints(r.Context(), 20)
+	// Get other endpoints for switching (only this user's endpoints)
+	allEndpoints, _ := h.Store.ListEndpoints(r.Context(), browserID, 20)
 	otherEndpoints := []*store.Endpoint{}
 	for _, e := range allEndpoints {
 		if e.ID != endpointID {

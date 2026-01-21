@@ -8,8 +8,11 @@ import (
 
 	"github.com/PipeOpsHQ/pipehook/internal/store"
 	"github.com/PipeOpsHQ/pipehook/ui"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
+
+const browserIDCookieName = "pipehook_browser_id"
 
 // Template functions
 var funcMap = template.FuncMap{
@@ -42,6 +45,31 @@ func NewHandler(s store.Store) *Handler {
 		Store:   s,
 		clients: make(map[string][]*websocket.Conn),
 	}
+}
+
+// GetBrowserID retrieves or creates a browser fingerprint ID from cookies
+func (h *Handler) GetBrowserID(w http.ResponseWriter, r *http.Request) string {
+	// Try to get existing browser ID from cookie
+	cookie, err := r.Cookie(browserIDCookieName)
+	if err == nil && cookie.Value != "" {
+		return cookie.Value
+	}
+
+	// Generate new browser ID
+	browserID := uuid.New().String()
+
+	// Set cookie (expires in 1 year)
+	http.SetCookie(w, &http.Cookie{
+		Name:     browserIDCookieName,
+		Value:    browserID,
+		Path:     "/",
+		MaxAge:   365 * 24 * 60 * 60, // 1 year
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https",
+	})
+
+	return browserID
 }
 
 func (h *Handler) Broadcast(endpointID string, req *store.Request) {

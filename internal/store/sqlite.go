@@ -52,9 +52,11 @@ func (s *SQLiteStore) init() error {
 	CREATE TABLE IF NOT EXISTS endpoints (
 		id TEXT PRIMARY KEY,
 		alias TEXT,
+		creator_id TEXT,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		expires_at DATETIME
 	);
+	CREATE INDEX IF NOT EXISTS idx_endpoints_creator_id ON endpoints(creator_id);
 	CREATE TABLE IF NOT EXISTS requests (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		endpoint_id TEXT,
@@ -69,6 +71,8 @@ func (s *SQLiteStore) init() error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_requests_endpoint_id ON requests(endpoint_id);
 	`
+	// Migration: Add creator_id column if it doesn't exist
+	s.db.Exec("ALTER TABLE endpoints ADD COLUMN creator_id TEXT")
 	_, err = s.db.Exec(query)
 	if err != nil {
 		log.Printf("Database schema initialization failed: %v", err)
@@ -76,20 +80,20 @@ func (s *SQLiteStore) init() error {
 	return err
 }
 
-func (s *SQLiteStore) CreateEndpoint(ctx context.Context, id string, alias string, ttl time.Duration) (*Endpoint, error) {
+func (s *SQLiteStore) CreateEndpoint(ctx context.Context, id string, alias string, creatorID string, ttl time.Duration) (*Endpoint, error) {
 	now := time.Now()
 	expiresAt := now.Add(ttl)
-	_, err := s.db.ExecContext(ctx, "INSERT INTO endpoints (id, alias, created_at, expires_at) VALUES (?, ?, ?, ?)", id, alias, now, expiresAt)
+	_, err := s.db.ExecContext(ctx, "INSERT INTO endpoints (id, alias, creator_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)", id, alias, creatorID, now, expiresAt)
 	if err != nil {
 		return nil, err
 	}
-	return &Endpoint{ID: id, Alias: alias, CreatedAt: now, ExpiresAt: expiresAt}, nil
+	return &Endpoint{ID: id, Alias: alias, CreatorID: creatorID, CreatedAt: now, ExpiresAt: expiresAt}, nil
 }
 
 func (s *SQLiteStore) GetEndpoint(ctx context.Context, id string) (*Endpoint, error) {
 	var e Endpoint
-	err := s.db.QueryRowContext(ctx, "SELECT id, alias, created_at, expires_at FROM endpoints WHERE id = ?", id).
-		Scan(&e.ID, &e.Alias, &e.CreatedAt, &e.ExpiresAt)
+	err := s.db.QueryRowContext(ctx, "SELECT id, alias, COALESCE(creator_id, ''), created_at, expires_at FROM endpoints WHERE id = ?", id).
+		Scan(&e.ID, &e.Alias, &e.CreatorID, &e.CreatedAt, &e.ExpiresAt)
 	if err != nil {
 		return nil, err
 	}
@@ -101,14 +105,14 @@ func (s *SQLiteStore) DeleteEndpoint(ctx context.Context, id string) error {
 	return err
 }
 
-func (s *SQLiteStore) ListEndpoints(ctx context.Context, limit int) ([]*Endpoint, error) {
+func (s *SQLiteStore) ListEndpoints(ctx context.Context, creatorID string, limit int) ([]*Endpoint, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, alias, created_at, expires_at
+		SELECT id, alias, COALESCE(creator_id, ''), created_at, expires_at
 		FROM endpoints
-		WHERE expires_at > ?
+		WHERE creator_id = ? AND expires_at > ?
 		ORDER BY created_at DESC
 		LIMIT ?
-	`, time.Now(), limit)
+	`, creatorID, time.Now(), limit)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +121,7 @@ func (s *SQLiteStore) ListEndpoints(ctx context.Context, limit int) ([]*Endpoint
 	var endpoints []*Endpoint
 	for rows.Next() {
 		var e Endpoint
-		err := rows.Scan(&e.ID, &e.Alias, &e.CreatedAt, &e.ExpiresAt)
+		err := rows.Scan(&e.ID, &e.Alias, &e.CreatorID, &e.CreatedAt, &e.ExpiresAt)
 		if err != nil {
 			return nil, err
 		}
