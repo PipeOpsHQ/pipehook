@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"log"
 	"net/http"
 	"sync"
 	"text/template"
@@ -73,22 +74,26 @@ func (h *Handler) GetBrowserID(w http.ResponseWriter, r *http.Request) string {
 }
 
 func (h *Handler) Broadcast(endpointID string, req *store.Request) {
-	h.clientsMu.RLock()
-	defer h.clientsMu.RUnlock()
+	h.clientsMu.Lock()
+	defer h.clientsMu.Unlock()
 
 	var buf bytes.Buffer
 	err := dashboardTemplate.ExecuteTemplate(&buf, "request-item", req)
 	if err != nil {
+		log.Printf("Broadcast template error: %v", err)
 		return
 	}
 
 	clients := h.clients[endpointID]
+	log.Printf("Broadcasting to %d WebSocket clients for endpoint %s", len(clients), endpointID)
+
 	for i := len(clients) - 1; i >= 0; i-- {
 		conn := clients[i]
 		if err := conn.WriteJSON(map[string]interface{}{
 			"type":    "new-request",
 			"payload": buf.String(),
 		}); err != nil {
+			log.Printf("WebSocket send error, removing client: %v", err)
 			// Remove disconnected client
 			clients = append(clients[:i], clients[i+1:]...)
 			conn.Close()

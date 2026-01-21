@@ -585,15 +585,22 @@
             const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
             const endpointIdElement = document.getElementById("endpoint-header");
             const endpointId = endpointIdElement ? endpointIdElement.getAttribute("data-endpoint-id") : null;
+            console.log("WebSocket setup - endpointId:", endpointId);
             if(endpointId) {
                 const wsUrl = protocol + "//" + window.location.host + "/ws/" + endpointId;
+                console.log("Connecting WebSocket to:", wsUrl);
                 const ws = new WebSocket(wsUrl);
                 const requestList = document.getElementById("request-list");
                 const requestCount = document.getElementById("request-count");
 
                 var MAX_DOM_ITEMS = 200; // Limit DOM elements to prevent memory bloat
 
+                ws.onopen = function() {
+                    console.log("WebSocket connected successfully");
+                };
+
                 ws.onmessage = function(event) {
+                    console.log("WebSocket message received:", event.data);
                     var data = JSON.parse(event.data);
                     if (data.type === "new-request") {
                         // Create element from HTML string
