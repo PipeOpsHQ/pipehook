@@ -44,7 +44,7 @@ func (h *Handler) CreateEndpoint(w http.ResponseWriter, r *http.Request) {
 	browserID := h.GetBrowserID(w, r)
 
 	id := uuid.New().String()
-	_, err := h.Store.CreateEndpoint(r.Context(), id, "", browserID, 24*time.Hour)
+	_, err := h.Store.CreateEndpoint(r.Context(), id, "", browserID, store.DefaultTTL)
 	if err != nil {
 		http.Error(w, "failed to create endpoint", http.StatusInternalServerError)
 		return
@@ -430,5 +430,65 @@ func (h *Handler) DeleteEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) UpdateEndpointSettings(w http.ResponseWriter, r *http.Request) {
+	endpointID := chi.URLParam(r, "endpointID")
+	if endpointID == "" {
+		http.Error(w, "missing endpoint ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get browser ID
+	browserID := h.GetBrowserID(w, r)
+
+	// Verify endpoint exists and belongs to this user
+	endpoint, err := h.Store.GetEndpoint(r.Context(), endpointID)
+	if err != nil {
+		http.Error(w, "endpoint not found", http.StatusNotFound)
+		return
+	}
+
+	// Check ownership
+	if endpoint.CreatorID != "" && endpoint.CreatorID != browserID {
+		http.Error(w, "unauthorized", http.StatusForbidden)
+		return
+	}
+
+	// Parse form data
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	alias := strings.TrimSpace(r.FormValue("alias"))
+	ttlStr := r.FormValue("ttl")
+
+	// Map TTL string to duration
+	var ttl time.Duration
+	switch ttlStr {
+	case "1week":
+		ttl = store.TTL1Week
+	case "1month":
+		ttl = store.TTL1Month
+	case "3months":
+		ttl = store.TTL3Months
+	case "6months":
+		ttl = store.TTL6Months
+	default:
+		ttl = store.DefaultTTL
+	}
+
+	// Update endpoint
+	if err := h.Store.UpdateEndpoint(r.Context(), endpointID, alias, ttl); err != nil {
+		log.Printf("Error updating endpoint %s: %v", endpointID, err)
+		http.Error(w, "failed to update endpoint", http.StatusInternalServerError)
+		return
+	}
+
+	// Return success with HX-Trigger to refresh the page
+	w.Header().Set("HX-Trigger", "settingsUpdated")
+	w.Header().Set("HX-Redirect", "/"+endpointID)
 	w.WriteHeader(http.StatusOK)
 }

@@ -119,6 +119,7 @@ func main() {
 	r.Post("/r/{requestID}/replay", h.ReplayRequest)
 	r.Delete("/r/{requestID}", h.DeleteRequest)
 	r.Delete("/endpoint/{endpointID}", h.DeleteEndpoint)
+	r.Post("/endpoint/{endpointID}/settings", h.UpdateEndpointSettings)
 	r.Get("/ws/{endpointID}", h.WebSocket)
 	r.Get("/{endpointID}/more", h.LoadMoreRequests)
 	r.Get("/{endpointID}", h.Dashboard)

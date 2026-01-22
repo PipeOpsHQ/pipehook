@@ -77,6 +77,10 @@
                     Live Stream
                 </span>
                 {{ if .Endpoint }}
+                <button onclick="openSettingsModal()" class="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-all active:scale-95 flex items-center gap-1.5">
+                    <i class="fas fa-cog text-[10px]"></i>
+                    Settings
+                </button>
                 <button class="text-xs font-bold text-white bg-red-600 hover:bg-red-500 px-3 py-1.5 rounded-lg transition-all active:scale-95 flex items-center gap-1.5 shadow-lg shadow-red-600/10"
                         data-endpoint-id="{{ .Endpoint.ID }}"
                         hx-delete="/endpoint/{{ .Endpoint.ID }}"
@@ -677,7 +681,89 @@
                 });
             }
         })();
+
+        // Settings Modal Functions
+        function openSettingsModal() {
+            var modal = document.getElementById("settings-modal");
+            if (modal) {
+                modal.classList.remove("hidden");
+                modal.classList.add("flex");
+                document.body.style.overflow = "hidden";
+            }
+        }
+        window.openSettingsModal = openSettingsModal;
+
+        function closeSettingsModal() {
+            var modal = document.getElementById("settings-modal");
+            if (modal) {
+                modal.classList.add("hidden");
+                modal.classList.remove("flex");
+                document.body.style.overflow = "";
+            }
+        }
+        window.closeSettingsModal = closeSettingsModal;
+
+        // Close modal when clicking outside
+        document.addEventListener("click", function(event) {
+            var modal = document.getElementById("settings-modal");
+            if (modal && event.target === modal) {
+                closeSettingsModal();
+            }
+        });
+
+        // Close modal on Escape key
+        document.addEventListener("keydown", function(event) {
+            if (event.key === "Escape") {
+                closeSettingsModal();
+            }
+        });
     </script>
+
+    {{ if .Endpoint }}
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 items-center justify-center">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl w-full max-w-md mx-4" onclick="event.stopPropagation()">
+            <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+                <h3 class="text-lg font-bold text-white">Endpoint Settings</h3>
+                <button onclick="closeSettingsModal()" class="text-slate-500 hover:text-white transition-colors p-1">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form hx-post="/endpoint/{{ .Endpoint.ID }}/settings" hx-swap="none" class="p-6 space-y-6">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-300 mb-2">Alias (optional)</label>
+                    <input type="text" name="alias" value="{{ .Endpoint.Alias }}"
+                           placeholder="e.g., My Payment Webhook"
+                           class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                    <p class="text-xs text-slate-500 mt-1.5">Give your endpoint a friendly name</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-300 mb-2">Expiration</label>
+                    <select name="ttl" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+                        <option value="1week">1 Week</option>
+                        <option value="1month">1 Month</option>
+                        <option value="3months" selected>3 Months (Default)</option>
+                        <option value="6months">6 Months</option>
+                    </select>
+                    <p class="text-xs text-slate-500 mt-1.5">How long this endpoint will remain active</p>
+                    <p class="text-xs text-slate-400 mt-2 bg-slate-800/50 px-3 py-2 rounded-lg">
+                        <i class="fas fa-info-circle text-brand-400 mr-1"></i>
+                        Created: {{ .Endpoint.CreatedAt.Format "Jan 2, 2006" }} ·
+                        Expires: {{ .Endpoint.ExpiresAt.Format "Jan 2, 2006" }}
+                    </p>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="closeSettingsModal()" class="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 px-4 py-2.5 text-sm font-bold text-white bg-brand-600 hover:bg-brand-500 rounded-lg transition-colors shadow-lg shadow-brand-600/20">
+                        <i class="fas fa-save mr-2"></i>Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {{ end }}
 {{ end }}
 
 {{ define "request-item" }}

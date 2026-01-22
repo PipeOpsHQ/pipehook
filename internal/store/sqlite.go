@@ -100,6 +100,22 @@ func (s *SQLiteStore) GetEndpoint(ctx context.Context, id string) (*Endpoint, er
 	return &e, nil
 }
 
+func (s *SQLiteStore) UpdateEndpoint(ctx context.Context, id string, alias string, ttl time.Duration) error {
+	// Get current endpoint to calculate new expiry from creation time
+	var createdAt time.Time
+	err := s.db.QueryRowContext(ctx, "SELECT created_at FROM endpoints WHERE id = ?", id).Scan(&createdAt)
+	if err != nil {
+		return err
+	}
+	newExpiresAt := createdAt.Add(ttl)
+	// Don't allow expiry in the past - use at least now + 1 day
+	if newExpiresAt.Before(time.Now()) {
+		newExpiresAt = time.Now().Add(24 * time.Hour)
+	}
+	_, err = s.db.ExecContext(ctx, "UPDATE endpoints SET alias = ?, expires_at = ? WHERE id = ?", alias, newExpiresAt, id)
+	return err
+}
+
 func (s *SQLiteStore) DeleteEndpoint(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM endpoints WHERE id = ?", id)
 	return err

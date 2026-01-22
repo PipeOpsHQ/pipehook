@@ -25,9 +25,19 @@ type Request struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+// TTL options for endpoints
+const (
+	TTL1Week   = 7 * 24 * time.Hour
+	TTL1Month  = 30 * 24 * time.Hour
+	TTL3Months = 90 * 24 * time.Hour
+	TTL6Months = 180 * 24 * time.Hour
+	DefaultTTL = TTL3Months
+)
+
 type Store interface {
 	CreateEndpoint(ctx context.Context, id string, alias string, creatorID string, ttl time.Duration) (*Endpoint, error)
 	GetEndpoint(ctx context.Context, id string) (*Endpoint, error)
+	UpdateEndpoint(ctx context.Context, id string, alias string, ttl time.Duration) error
 	DeleteEndpoint(ctx context.Context, id string) error
 	ListEndpoints(ctx context.Context, creatorID string, limit int) ([]*Endpoint, error)
 
