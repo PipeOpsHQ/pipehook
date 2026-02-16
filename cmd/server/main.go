@@ -92,6 +92,10 @@ func main() {
 
 	h := handler.NewHandler(s)
 
+	// Get admin credentials from environment variables
+	adminUsername := os.Getenv("ADMIN_USERNAME")
+	adminPassword := os.Getenv("ADMIN_PASSWORD")
+
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
 
@@ -115,7 +119,10 @@ func main() {
 	// UI
 	r.Get("/", h.Home)
 	r.Post("/new", h.CreateEndpoint)
-	r.Get("/admin", h.AdminPage)
+	
+	// Admin page with basic auth protection
+	r.With(handler.BasicAuthMiddleware(adminUsername, adminPassword)).Get("/admin", h.AdminPage)
+	
 	r.Get("/r/{requestID}", h.RequestDetail)
 	r.Post("/r/{requestID}/replay", h.ReplayRequest)
 	r.Delete("/r/{requestID}", h.DeleteRequest)
