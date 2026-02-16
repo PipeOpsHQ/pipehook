@@ -1,0 +1,110 @@
+{{ define "content" }}
+<div class="h-full flex flex-col p-6 overflow-auto custom-scrollbar">
+    <div class="max-w-5xl w-full mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="w-16 h-16 bg-brand-500/10 rounded-2xl flex items-center justify-center mb-4 border border-brand-500/20">
+                <i class="fas fa-chart-bar text-3xl text-brand-500"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-white mb-2 tracking-tight">Admin Dashboard</h1>
+            <p class="text-slate-400 text-sm">Overview of webhook endpoints and usage statistics</p>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+            <!-- Total Endpoints Card -->
+            <div class="bg-slate-900 rounded-lg border border-slate-800 p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em]">Total Endpoints</h3>
+                    <i class="fas fa-link text-slate-700"></i>
+                </div>
+                <div class="text-4xl font-bold text-white mb-1">{{ .Stats.TotalEndpoints }}</div>
+                <p class="text-xs text-slate-500">Active webhook endpoints</p>
+            </div>
+
+            <!-- Total Requests Card -->
+            <div class="bg-slate-900 rounded-lg border border-slate-800 p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em]">Total Requests</h3>
+                    <i class="fas fa-inbox text-slate-700"></i>
+                </div>
+                <div class="text-4xl font-bold text-white mb-1">{{ .Stats.TotalRequests }}</div>
+                <p class="text-xs text-slate-500">Received webhook requests</p>
+            </div>
+        </div>
+
+        <!-- Endpoint Usage Table -->
+        <div class="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden">
+            <div class="p-4 border-b border-slate-800">
+                <h2 class="text-xs font-bold text-slate-500 uppercase tracking-[0.2em]">Endpoint Usage</h2>
+            </div>
+            
+            {{ if .Stats.EndpointUsageStats }}
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-slate-800/50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Endpoint</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Requests</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Created</th>
+                            <th class="px-4 py-3 text-left text-xs font-semibold text-slate-400 uppercase tracking-wider">Last Request</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800">
+                        {{ range .Stats.EndpointUsageStats }}
+                        <tr class="hover:bg-slate-800/30 transition-colors">
+                            <td class="px-4 py-3">
+                                <div class="flex flex-col">
+                                    <code class="text-sm font-mono text-slate-300">{{ .EndpointID }}</code>
+                                    {{ if .Alias }}
+                                    <span class="text-xs text-slate-500 mt-1">{{ .Alias }}</span>
+                                    {{ end }}
+                                </div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-lg font-bold text-white">{{ .RequestCount }}</span>
+                                    {{ if gt .RequestCount 0 }}
+                                    <span class="px-2 py-0.5 bg-green-500/20 text-green-400 text-[10px] font-bold rounded">ACTIVE</span>
+                                    {{ else }}
+                                    <span class="px-2 py-0.5 bg-slate-700 text-slate-400 text-[10px] font-bold rounded">UNUSED</span>
+                                    {{ end }}
+                                </div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="text-xs text-slate-400" data-timestamp="{{ .CreatedAt.Format "2006-01-02T15:04:05Z07:00" }}">
+                                    {{ .CreatedAt.Format "Jan 02, 2006" }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3">
+                                {{ if .LastRequestAt }}
+                                <span class="text-xs text-slate-400" data-timestamp="{{ .LastRequestAt.Format "2006-01-02T15:04:05Z07:00" }}">
+                                    {{ .LastRequestAt.Format "Jan 02, 2006 15:04" }}
+                                </span>
+                                {{ else }}
+                                <span class="text-xs text-slate-600">Never</span>
+                                {{ end }}
+                            </td>
+                        </tr>
+                        {{ end }}
+                    </tbody>
+                </table>
+            </div>
+            {{ else }}
+            <div class="p-8 text-center text-slate-500">
+                <i class="fas fa-inbox text-4xl mb-3 opacity-20"></i>
+                <p class="text-sm">No endpoints found</p>
+            </div>
+            {{ end }}
+        </div>
+
+        <!-- Back to Home Link -->
+        <div class="mt-6 text-center">
+            <a href="/" class="inline-flex items-center gap-2 text-xs text-slate-500 hover:text-brand-500 transition-colors">
+                <i class="fas fa-arrow-left"></i>
+                <span>Back to Endpoints</span>
+            </a>
+        </div>
+    </div>
+</div>
+{{ end }}

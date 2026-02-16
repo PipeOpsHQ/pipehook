@@ -49,4 +49,21 @@ type Store interface {
 	DeleteRequest(ctx context.Context, id int64) error
 
 	Cleanup(ctx context.Context) error
+
+	// Admin statistics
+	GetAdminStats(ctx context.Context) (*AdminStats, error)
+}
+
+type AdminStats struct {
+	TotalEndpoints     int                  `json:"total_endpoints"`
+	TotalRequests      int                  `json:"total_requests"`
+	EndpointUsageStats []EndpointUsageStat  `json:"endpoint_usage_stats"`
+}
+
+type EndpointUsageStat struct {
+	EndpointID    string    `json:"endpoint_id"`
+	Alias         string    `json:"alias"`
+	RequestCount  int       `json:"request_count"`
+	CreatedAt     time.Time `json:"created_at"`
+	LastRequestAt *time.Time `json:"last_request_at,omitempty"`
 }

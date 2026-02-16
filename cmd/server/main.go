@@ -115,6 +115,7 @@ func main() {
 	// UI
 	r.Get("/", h.Home)
 	r.Post("/new", h.CreateEndpoint)
+	r.Get("/admin", h.AdminPage)
 	r.Get("/r/{requestID}", h.RequestDetail)
 	r.Post("/r/{requestID}/replay", h.ReplayRequest)
 	r.Delete("/r/{requestID}", h.DeleteRequest)
