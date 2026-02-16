@@ -96,6 +96,10 @@ func main() {
 	adminUsername := os.Getenv("ADMIN_USERNAME")
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
 	
+	// Set admin credentials in handler so it can check authentication
+	h.AdminUsername = adminUsername
+	h.AdminPassword = adminPassword
+	
 	if adminUsername != "" && adminPassword != "" {
 		log.Printf("Admin authentication enabled for /admin endpoint")
 	} else {

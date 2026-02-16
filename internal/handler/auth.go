@@ -6,6 +6,28 @@ import (
 	"net/http"
 )
 
+// IsAdminAuthenticated checks if the current request has valid admin credentials
+// Returns true if admin credentials are configured and the request has valid credentials
+// Returns false if admin credentials are not configured or request has invalid/missing credentials
+func (h *Handler) IsAdminAuthenticated(r *http.Request) bool {
+	// If no credentials are configured, admin is not authenticated
+	if h.AdminUsername == "" || h.AdminPassword == "" {
+		return false
+	}
+
+	// Get credentials from request
+	user, pass, ok := r.BasicAuth()
+	if !ok {
+		return false
+	}
+
+	// Use constant-time comparison to prevent timing attacks on credential values
+	validUser := subtle.ConstantTimeCompare([]byte(user), []byte(h.AdminUsername)) == 1
+	validPass := subtle.ConstantTimeCompare([]byte(pass), []byte(h.AdminPassword)) == 1
+
+	return validUser && validPass
+}
+
 // BasicAuthMiddleware creates a middleware that protects routes with HTTP Basic Authentication
 // If username or password is empty, authentication is disabled (for backward compatibility)
 func BasicAuthMiddleware(username, password string) func(http.Handler) http.Handler {

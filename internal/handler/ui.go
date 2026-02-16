@@ -25,9 +25,13 @@ func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
+		BaseTemplateData
 		Endpoints []*store.Endpoint
 		Host      string
 	}{
+		BaseTemplateData: BaseTemplateData{
+			IsAdmin: h.IsAdminAuthenticated(r),
+		},
 		Endpoints: endpoints,
 		Host:      r.Host,
 	}
@@ -198,6 +202,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	hasMore := len(requests) < totalCount
 
 	data := struct {
+		BaseTemplateData
 		Endpoint       *store.Endpoint
 		Requests       []*store.Request
 		FirstRequest   *requestDetailData
@@ -207,6 +212,9 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		HasMore        bool
 		Limit          int
 	}{
+		BaseTemplateData: BaseTemplateData{
+			IsAdmin: h.IsAdminAuthenticated(r),
+		},
 		Endpoint:       endpoint,
 		Requests:       requests,
 		FirstRequest:   firstRequest,
