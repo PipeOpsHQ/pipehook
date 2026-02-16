@@ -95,6 +95,12 @@ func main() {
 	// Get admin credentials from environment variables
 	adminUsername := os.Getenv("ADMIN_USERNAME")
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
+	
+	if adminUsername != "" && adminPassword != "" {
+		log.Printf("Admin authentication enabled for /admin endpoint")
+	} else {
+		log.Printf("WARNING: Admin authentication is disabled. Set ADMIN_USERNAME and ADMIN_PASSWORD environment variables to protect the admin endpoint.")
+	}
 
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
@@ -119,10 +125,6 @@ func main() {
 	// UI
 	r.Get("/", h.Home)
 	r.Post("/new", h.CreateEndpoint)
-	
-	// Admin page with basic auth protection
-	r.With(handler.BasicAuthMiddleware(adminUsername, adminPassword)).Get("/admin", h.AdminPage)
-	
 	r.Get("/r/{requestID}", h.RequestDetail)
 	r.Post("/r/{requestID}/replay", h.ReplayRequest)
 	r.Delete("/r/{requestID}", h.DeleteRequest)
@@ -131,6 +133,12 @@ func main() {
 	r.Get("/ws/{endpointID}", h.WebSocket)
 	r.Get("/{endpointID}/more", h.LoadMoreRequests)
 	r.Get("/{endpointID}", h.Dashboard)
+
+	// Admin routes (protected with basic auth if credentials are set)
+	r.Group(func(r chi.Router) {
+		r.Use(handler.BasicAuthMiddleware(adminUsername, adminPassword))
+		r.Get("/admin", h.AdminPage)
+	})
 
 	// Webhook receiver - accept ALL HTTP methods (GET, POST, PUT, PATCH, DELETE, etc.)
 	// Using HandleFunc which accepts all methods, and also explicitly registering common methods
