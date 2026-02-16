@@ -3,6 +3,8 @@ package handler
 import (
 	"log"
 	"net/http"
+
+	"github.com/PipeOpsHQ/pipehook/internal/store"
 )
 
 func (h *Handler) AdminPage(w http.ResponseWriter, r *http.Request) {
@@ -14,7 +16,7 @@ func (h *Handler) AdminPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Stats interface{}
+		Stats *store.AdminStats
 	}{
 		Stats: stats,
 	}

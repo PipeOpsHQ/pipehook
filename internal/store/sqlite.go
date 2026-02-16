@@ -283,34 +283,33 @@ func (s *SQLiteStore) GetAdminStats(ctx context.Context) (*AdminStats, error) {
 			return nil, err
 		}
 		if lastRequestStr.Valid && lastRequestStr.String != "" {
-			// Parse the time string - SQLite returns Go's default time format
-			// Example: "2006-01-02 15:04:05.999999999 -0700 MST m=+0.000000001"
+			// SQLite stores Go time.Time values as strings using time.String() format
+			// which includes monotonic clock reading: "2006-01-02 15:04:05.999999999 -0700 MST m=+0.000000001"
+			// We need to remove the monotonic part before parsing
 			timeStr := lastRequestStr.String
-			// Remove the monotonic clock reading if present
 			if idx := strings.Index(timeStr, " m="); idx > 0 {
 				timeStr = timeStr[:idx]
 			}
 			
-			// Try multiple time formats
+			// Parse the timestamp - try common formats
+			var t time.Time
+			var parseErr error
 			formats := []string{
 				"2006-01-02 15:04:05.999999999 -0700 MST",
 				"2006-01-02 15:04:05.999999999 -0700",
 				"2006-01-02 15:04:05 -0700 MST",
 				"2006-01-02 15:04:05 -0700",
-				"2006-01-02 15:04:05.999999999",
-				"2006-01-02 15:04:05",
-				time.RFC3339,
-				time.RFC3339Nano,
 			}
 			
-			var t time.Time
-			var parseErr error
 			for _, format := range formats {
 				t, parseErr = time.Parse(format, timeStr)
 				if parseErr == nil {
 					stat.LastRequestAt = &t
 					break
 				}
+			}
+			if parseErr != nil {
+				log.Printf("Warning: failed to parse last_request_at '%s': %v", timeStr, parseErr)
 			}
 		}
 		stats.EndpointUsageStats = append(stats.EndpointUsageStats, stat)
