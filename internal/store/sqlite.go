@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -237,4 +238,82 @@ func (s *SQLiteStore) DeleteRequest(ctx context.Context, id int64) error {
 func (s *SQLiteStore) Cleanup(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM endpoints WHERE expires_at < ?", time.Now())
 	return err
+}
+
+func (s *SQLiteStore) GetAdminStats(ctx context.Context) (*AdminStats, error) {
+	stats := &AdminStats{
+		EndpointUsageStats: []EndpointUsageStat{},
+	}
+
+	// Get total endpoints count
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM endpoints").Scan(&stats.TotalEndpoints)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get total requests count
+	err = s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM requests").Scan(&stats.TotalRequests)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get per-endpoint usage stats
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT 
+			e.id,
+			COALESCE(e.alias, ''),
+			e.created_at,
+			COUNT(r.id) as request_count,
+			MAX(r.created_at) as last_request_at
+		FROM endpoints e
+		LEFT JOIN requests r ON e.id = r.endpoint_id
+		GROUP BY e.id, e.alias, e.created_at
+		ORDER BY request_count DESC, e.created_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var stat EndpointUsageStat
+		var lastRequestStr sql.NullString
+		err := rows.Scan(&stat.EndpointID, &stat.Alias, &stat.CreatedAt, &stat.RequestCount, &lastRequestStr)
+		if err != nil {
+			return nil, err
+		}
+		if lastRequestStr.Valid && lastRequestStr.String != "" {
+			// SQLite stores Go time.Time values as strings using time.String() format
+			// which includes monotonic clock reading: "2006-01-02 15:04:05.999999999 -0700 MST m=+0.000000001"
+			// We need to remove the monotonic part before parsing
+			timeStr := lastRequestStr.String
+			if idx := strings.Index(timeStr, " m="); idx > 0 {
+				timeStr = timeStr[:idx]
+			}
+			
+			// Parse the timestamp - try common formats
+			var t time.Time
+			var parseErr error
+			formats := []string{
+				"2006-01-02 15:04:05.999999999 -0700 MST",
+				"2006-01-02 15:04:05.999999999 -0700",
+				"2006-01-02 15:04:05 -0700 MST",
+				"2006-01-02 15:04:05 -0700",
+			}
+			
+			for _, format := range formats {
+				t, parseErr = time.Parse(format, timeStr)
+				if parseErr == nil {
+					stat.LastRequestAt = &t
+					break
+				}
+			}
+			if parseErr != nil {
+				log.Printf("Warning: failed to parse last_request_at '%s': %v", timeStr, parseErr)
+			}
+		}
+		stats.EndpointUsageStats = append(stats.EndpointUsageStats, stat)
+	}
+
+	return stats, nil
 }

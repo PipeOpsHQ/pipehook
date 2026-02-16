@@ -25,6 +25,7 @@ var (
 	homeTemplate      = template.Must(template.New("").Funcs(funcMap).ParseFS(ui.FS, "templates/layout.html", "templates/home.html"))
 	dashboardTemplate = template.Must(template.New("").Funcs(funcMap).ParseFS(ui.FS, "templates/layout.html", "templates/dashboard.html", "templates/request-detail.html"))
 	detailTemplate    = template.Must(template.New("").Funcs(funcMap).ParseFS(ui.FS, "templates/request-detail.html"))
+	adminTemplate     = template.Must(template.New("").Funcs(funcMap).ParseFS(ui.FS, "templates/layout.html", "templates/admin.html"))
 
 	upgrader = websocket.Upgrader{
 		ReadBufferSize:  1024,
