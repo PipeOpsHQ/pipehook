@@ -15,6 +15,11 @@ import (
 
 const browserIDCookieName = "pipehook_browser_id"
 
+// BaseTemplateData contains common data for all templates
+type BaseTemplateData struct {
+	IsAdmin bool
+}
+
 // Template functions
 var funcMap = template.FuncMap{
 	"sub": func(a, b int) int { return a - b },
@@ -37,9 +42,11 @@ var (
 )
 
 type Handler struct {
-	Store     store.Store
-	clients   map[string][]*websocket.Conn // endpointID -> WebSocket connections
-	clientsMu sync.RWMutex
+	Store         store.Store
+	clients       map[string][]*websocket.Conn // endpointID -> WebSocket connections
+	clientsMu     sync.RWMutex
+	AdminUsername string
+	AdminPassword string
 }
 
 func NewHandler(s store.Store) *Handler {

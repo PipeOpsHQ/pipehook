@@ -16,8 +16,12 @@ func (h *Handler) AdminPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
+		BaseTemplateData
 		Stats *store.AdminStats
 	}{
+		BaseTemplateData: BaseTemplateData{
+			IsAdmin: true, // Admin page is protected, so if we're here, user is admin
+		},
 		Stats: stats,
 	}
 
