@@ -42,17 +42,19 @@ var (
 )
 
 type Handler struct {
-	Store         store.Store
-	clients       map[string][]*websocket.Conn // endpointID -> WebSocket connections
-	clientsMu     sync.RWMutex
-	AdminUsername string
-	AdminPassword string
+	Store               store.Store
+	clients             map[string][]*websocket.Conn // endpointID -> WebSocket connections
+	clientsMu           sync.RWMutex
+	AdminUsername       string
+	AdminPassword       string
+	MaxWebhookBodyBytes int64
 }
 
 func NewHandler(s store.Store) *Handler {
 	return &Handler{
-		Store:   s,
-		clients: make(map[string][]*websocket.Conn),
+		Store:               s,
+		clients:             make(map[string][]*websocket.Conn),
+		MaxWebhookBodyBytes: 2 * 1024 * 1024, // 2MB default
 	}
 }
 
@@ -108,4 +110,15 @@ func (h *Handler) Broadcast(endpointID string, req *store.Request) {
 		}
 	}
 	h.clients[endpointID] = clients
+}
+
+func (h *Handler) closeEndpointConnections(endpointID string) {
+	h.clientsMu.Lock()
+	defer h.clientsMu.Unlock()
+
+	clients := h.clients[endpointID]
+	for _, conn := range clients {
+		conn.Close()
+	}
+	delete(h.clients, endpointID)
 }

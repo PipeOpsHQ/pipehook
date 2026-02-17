@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/PipeOpsHQ/pipehook/internal/handler"
 	"github.com/PipeOpsHQ/pipehook/internal/store"
 	"github.com/PipeOpsHQ/pipehook/ui"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 // parseSize parses a size string like "50MB", "100KB", "1GB" into bytes
@@ -92,14 +92,26 @@ func main() {
 
 	h := handler.NewHandler(s)
 
+	maxWebhookBodySize := int64(2 * 1024 * 1024) // 2MB default
+	if maxBodySizeStr := os.Getenv("MAX_WEBHOOK_BODY_SIZE"); maxBodySizeStr != "" {
+		parsedSize, parseErr := parseSize(maxBodySizeStr)
+		if parseErr != nil || parsedSize <= 0 {
+			log.Printf("Invalid MAX_WEBHOOK_BODY_SIZE=%q, using default 2MB", maxBodySizeStr)
+		} else {
+			maxWebhookBodySize = parsedSize
+		}
+	}
+	h.MaxWebhookBodyBytes = maxWebhookBodySize
+	log.Printf("Webhook max body size configured to %d bytes", maxWebhookBodySize)
+
 	// Get admin credentials from environment variables
 	adminUsername := os.Getenv("ADMIN_USERNAME")
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
-	
+
 	// Set admin credentials in handler so it can check authentication
 	h.AdminUsername = adminUsername
 	h.AdminPassword = adminPassword
-	
+
 	if adminUsername != "" && adminPassword != "" {
 		log.Printf("Admin authentication enabled for /admin endpoint")
 	} else {
@@ -142,6 +154,7 @@ func main() {
 	r.Group(func(r chi.Router) {
 		r.Use(handler.BasicAuthMiddleware(adminUsername, adminPassword))
 		r.Get("/admin", h.AdminPage)
+		r.Delete("/admin/endpoint/{endpointID}", h.AdminDeleteEndpoint)
 	})
 
 	// Webhook receiver - accept ALL HTTP methods (GET, POST, PUT, PATCH, DELETE, etc.)

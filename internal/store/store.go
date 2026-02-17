@@ -44,6 +44,8 @@ type Store interface {
 	SaveRequest(ctx context.Context, req *Request) error
 	GetRequests(ctx context.Context, endpointID string, limit int) ([]*Request, error)
 	GetRequestsWithOffset(ctx context.Context, endpointID string, limit int, offset int) ([]*Request, error)
+	GetRequestSummaries(ctx context.Context, endpointID string, limit int) ([]*Request, error)
+	GetRequestSummariesWithOffset(ctx context.Context, endpointID string, limit int, offset int) ([]*Request, error)
 	CountRequests(ctx context.Context, endpointID string) (int, error)
 	GetRequest(ctx context.Context, id int64) (*Request, error)
 	DeleteRequest(ctx context.Context, id int64) error
@@ -55,15 +57,15 @@ type Store interface {
 }
 
 type AdminStats struct {
-	TotalEndpoints     int                  `json:"total_endpoints"`
-	TotalRequests      int                  `json:"total_requests"`
-	EndpointUsageStats []EndpointUsageStat  `json:"endpoint_usage_stats"`
+	TotalEndpoints     int                 `json:"total_endpoints"`
+	TotalRequests      int                 `json:"total_requests"`
+	EndpointUsageStats []EndpointUsageStat `json:"endpoint_usage_stats"`
 }
 
 type EndpointUsageStat struct {
-	EndpointID    string    `json:"endpoint_id"`
-	Alias         string    `json:"alias"`
-	RequestCount  int       `json:"request_count"`
-	CreatedAt     time.Time `json:"created_at"`
+	EndpointID    string     `json:"endpoint_id"`
+	Alias         string     `json:"alias"`
+	RequestCount  int        `json:"request_count"`
+	CreatedAt     time.Time  `json:"created_at"`
 	LastRequestAt *time.Time `json:"last_request_at,omitempty"`
 }

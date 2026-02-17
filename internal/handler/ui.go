@@ -89,7 +89,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	requests, err := h.Store.GetRequests(r.Context(), endpointID, limit)
+	requests, err := h.Store.GetRequestSummaries(r.Context(), endpointID, limit)
 	if err != nil {
 		log.Printf("Error getting requests for endpoint %s: %v", endpointID, err)
 		http.Error(w, "failed to fetch requests", http.StatusInternalServerError)
@@ -116,75 +116,82 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	var firstRequest *requestDetailData
 	if len(requests) > 0 {
-		var headers map[string][]string
-		// Initialize headers map to avoid nil pointer issues
-		headers = make(map[string][]string)
-
-		// Safely unmarshal headers JSON
-		if requests[0].Headers != "" {
-			if err := json.Unmarshal([]byte(requests[0].Headers), &headers); err != nil {
-				log.Printf("Warning: Failed to unmarshal headers for request %d: %v", requests[0].ID, err)
-				// Continue with empty headers map
-				headers = make(map[string][]string)
-			}
+		fullRequest, err := h.Store.GetRequest(r.Context(), requests[0].ID)
+		if err != nil {
+			log.Printf("Warning: failed to load full request %d: %v", requests[0].ID, err)
 		}
 
-		// Format headers as JSON for display
-		headersJSON, _ := json.MarshalIndent(headers, "", "  ")
+		if fullRequest != nil {
+			var headers map[string][]string
+			// Initialize headers map to avoid nil pointer issues
+			headers = make(map[string][]string)
 
-		// Detect content type
-		contentType := "text/plain"
-		if ct, ok := headers["Content-Type"]; ok && len(ct) > 0 {
-			contentType = ct[0]
-			if idx := strings.Index(contentType, ";"); idx != -1 {
-				contentType = contentType[:idx]
-			}
-			contentType = strings.TrimSpace(contentType)
-		}
-
-		// Check if binary (only if significant portion is non-printable)
-		isBinary := false
-		if len(requests[0].Body) > 0 {
-			// If Content-Type suggests text/json, be extremely lenient
-			isTextType := false
-			ct := strings.ToLower(contentType)
-			if strings.Contains(ct, "json") || strings.Contains(ct, "text") || strings.Contains(ct, "xml") || strings.Contains(ct, "html") || strings.Contains(ct, "form-urlencoded") {
-				isTextType = true
-			}
-
-			nonPrintableCount := 0
-			sampleSize := len(requests[0].Body)
-			if sampleSize > 1000 {
-				sampleSize = 1000 // Sample first 1000 bytes for performance
-			}
-			for i := 0; i < sampleSize; i++ {
-				b := requests[0].Body[i]
-				// Allow common control characters: 9 (tab), 10 (LF), 13 (CR), 27 (ESC/ANSI)
-				if b < 32 && b != 9 && b != 10 && b != 13 && b != 27 {
-					nonPrintableCount++
+			// Safely unmarshal headers JSON
+			if fullRequest.Headers != "" {
+				if err := json.Unmarshal([]byte(fullRequest.Headers), &headers); err != nil {
+					log.Printf("Warning: Failed to unmarshal headers for request %d: %v", requests[0].ID, err)
+					// Continue with empty headers map
+					headers = make(map[string][]string)
 				}
 			}
 
-			// Thresholds:
-			// If text type: 50% non-printable to consider binary (very lenient)
-			// If unknown: 25% non-printable
-			threshold := 0.25
-			if isTextType {
-				threshold = 0.50
+			// Format headers as JSON for display
+			headersJSON, _ := json.MarshalIndent(headers, "", "  ")
+
+			// Detect content type
+			contentType := "text/plain"
+			if ct, ok := headers["Content-Type"]; ok && len(ct) > 0 {
+				contentType = ct[0]
+				if idx := strings.Index(contentType, ";"); idx != -1 {
+					contentType = contentType[:idx]
+				}
+				contentType = strings.TrimSpace(contentType)
 			}
 
-			if sampleSize > 0 && float64(nonPrintableCount)/float64(sampleSize) > threshold {
-				isBinary = true
-			}
-		}
+			// Check if binary (only if significant portion is non-printable)
+			isBinary := false
+			if len(fullRequest.Body) > 0 {
+				// If Content-Type suggests text/json, be extremely lenient
+				isTextType := false
+				ct := strings.ToLower(contentType)
+				if strings.Contains(ct, "json") || strings.Contains(ct, "text") || strings.Contains(ct, "xml") || strings.Contains(ct, "html") || strings.Contains(ct, "form-urlencoded") {
+					isTextType = true
+				}
 
-		firstRequest = &requestDetailData{
-			Request:     requests[0],
-			HeadersMap:  headers,
-			HeadersJSON: string(headersJSON),
-			BodyString:  string(requests[0].Body),
-			ContentType: contentType,
-			IsBinary:    isBinary,
+				nonPrintableCount := 0
+				sampleSize := len(fullRequest.Body)
+				if sampleSize > 1000 {
+					sampleSize = 1000 // Sample first 1000 bytes for performance
+				}
+				for i := 0; i < sampleSize; i++ {
+					b := fullRequest.Body[i]
+					// Allow common control characters: 9 (tab), 10 (LF), 13 (CR), 27 (ESC/ANSI)
+					if b < 32 && b != 9 && b != 10 && b != 13 && b != 27 {
+						nonPrintableCount++
+					}
+				}
+
+				// Thresholds:
+				// If text type: 50% non-printable to consider binary (very lenient)
+				// If unknown: 25% non-printable
+				threshold := 0.25
+				if isTextType {
+					threshold = 0.50
+				}
+
+				if sampleSize > 0 && float64(nonPrintableCount)/float64(sampleSize) > threshold {
+					isBinary = true
+				}
+			}
+
+			firstRequest = &requestDetailData{
+				Request:     fullRequest,
+				HeadersMap:  headers,
+				HeadersJSON: string(headersJSON),
+				BodyString:  string(fullRequest.Body),
+				ContentType: contentType,
+				IsBinary:    isBinary,
+			}
 		}
 	}
 
@@ -255,7 +262,7 @@ func (h *Handler) LoadMoreRequests(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	requests, err := h.Store.GetRequestsWithOffset(r.Context(), endpointID, limit, offset)
+	requests, err := h.Store.GetRequestSummariesWithOffset(r.Context(), endpointID, limit, offset)
 	if err != nil {
 		http.Error(w, "failed to fetch requests", http.StatusInternalServerError)
 		return
@@ -416,21 +423,22 @@ func (h *Handler) DeleteEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	browserID := h.GetBrowserID(w, r)
+
 	// Verify endpoint exists
-	_, err := h.Store.GetEndpoint(r.Context(), endpointID)
+	endpoint, err := h.Store.GetEndpoint(r.Context(), endpointID)
 	if err != nil {
 		http.Error(w, "endpoint not found", http.StatusNotFound)
 		return
 	}
 
-	// Close all WebSocket connections for this endpoint
-	h.clientsMu.Lock()
-	clients := h.clients[endpointID]
-	for _, conn := range clients {
-		conn.Close()
+	// Endpoint owners can delete their own endpoints, and admins can delete any endpoint.
+	if endpoint.CreatorID != "" && endpoint.CreatorID != browserID && !h.IsAdminAuthenticated(r) {
+		http.Error(w, "unauthorized", http.StatusForbidden)
+		return
 	}
-	delete(h.clients, endpointID)
-	h.clientsMu.Unlock()
+
+	h.closeEndpointConnections(endpointID)
 
 	// Delete the endpoint (this will cascade delete all requests due to FOREIGN KEY)
 	if err := h.Store.DeleteEndpoint(r.Context(), endpointID); err != nil {

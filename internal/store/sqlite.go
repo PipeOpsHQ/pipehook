@@ -19,6 +19,9 @@ func NewSQLiteStore(dsn string) (*SQLiteStore, error) {
 	if err != nil {
 		return nil, err
 	}
+	// SQLite performs best and more predictably with a single writer connection.
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
 
 	if err := db.Ping(); err != nil {
 		return nil, err
@@ -211,6 +214,54 @@ func (s *SQLiteStore) GetRequestsWithOffset(ctx context.Context, endpointID stri
 	return reqs, nil
 }
 
+func (s *SQLiteStore) GetRequestSummaries(ctx context.Context, endpointID string, limit int) ([]*Request, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, endpoint_id, method, path, remote_addr, created_at
+		FROM requests
+		WHERE endpoint_id = ?
+		ORDER BY created_at DESC
+		LIMIT ?
+	`, endpointID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reqs []*Request
+	for rows.Next() {
+		var r Request
+		if err := rows.Scan(&r.ID, &r.EndpointID, &r.Method, &r.Path, &r.RemoteAddr, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		reqs = append(reqs, &r)
+	}
+	return reqs, nil
+}
+
+func (s *SQLiteStore) GetRequestSummariesWithOffset(ctx context.Context, endpointID string, limit int, offset int) ([]*Request, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, endpoint_id, method, path, remote_addr, created_at
+		FROM requests
+		WHERE endpoint_id = ?
+		ORDER BY created_at DESC
+		LIMIT ? OFFSET ?
+	`, endpointID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var reqs []*Request
+	for rows.Next() {
+		var r Request
+		if err := rows.Scan(&r.ID, &r.EndpointID, &r.Method, &r.Path, &r.RemoteAddr, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		reqs = append(reqs, &r)
+	}
+	return reqs, nil
+}
+
 func (s *SQLiteStore) CountRequests(ctx context.Context, endpointID string) (int, error) {
 	var count int
 	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM requests WHERE endpoint_id = ?`, endpointID).Scan(&count)
@@ -290,7 +341,7 @@ func (s *SQLiteStore) GetAdminStats(ctx context.Context) (*AdminStats, error) {
 			if idx := strings.Index(timeStr, " m="); idx > 0 {
 				timeStr = timeStr[:idx]
 			}
-			
+
 			// Parse the timestamp - try common formats
 			var t time.Time
 			var parseErr error
@@ -300,7 +351,7 @@ func (s *SQLiteStore) GetAdminStats(ctx context.Context) (*AdminStats, error) {
 				"2006-01-02 15:04:05 -0700 MST",
 				"2006-01-02 15:04:05 -0700",
 			}
-			
+
 			for _, format := range formats {
 				t, parseErr = time.Parse(format, timeStr)
 				if parseErr == nil {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/PipeOpsHQ/pipehook/internal/store"
+	"github.com/go-chi/chi/v5"
 )
 
 func (h *Handler) AdminPage(w http.ResponseWriter, r *http.Request) {
@@ -30,4 +31,26 @@ func (h *Handler) AdminPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to render page", http.StatusInternalServerError)
 		return
 	}
+}
+
+func (h *Handler) AdminDeleteEndpoint(w http.ResponseWriter, r *http.Request) {
+	endpointID := chi.URLParam(r, "endpointID")
+	if endpointID == "" {
+		http.Error(w, "missing endpoint ID", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := h.Store.GetEndpoint(r.Context(), endpointID); err != nil {
+		http.Error(w, "endpoint not found", http.StatusNotFound)
+		return
+	}
+
+	h.closeEndpointConnections(endpointID)
+	if err := h.Store.DeleteEndpoint(r.Context(), endpointID); err != nil {
+		http.Error(w, "failed to delete endpoint", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("HX-Trigger", "endpointDeleted")
+	w.WriteHeader(http.StatusOK)
 }
