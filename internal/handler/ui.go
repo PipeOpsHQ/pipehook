@@ -1,7 +1,15 @@
 package handler
 
 import (
+	"bytes"
+	"compress/gzip"
+	"compress/zlib"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
 	"log"
+	"mime"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +19,23 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
+
+const (
+	maxDisplayTextBytes   = 256 * 1024
+	maxDisplayHexBytes    = 64 * 1024
+	maxDecodedDisplaySize = 2 * 1024 * 1024
+)
+
+type requestDetailData struct {
+	*store.Request
+	HeadersMap    map[string][]string
+	HeadersJSON   string
+	BodyString    string
+	BodyHex       string
+	ContentType   string
+	IsBinary      bool
+	DisplayNotice string
+}
 
 func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 	// Get or create browser ID for this user
@@ -352,4 +377,206 @@ func (h *Handler) UpdateEndpointSettings(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("HX-Trigger", "settingsUpdated")
 	w.Header().Set("HX-Redirect", "/"+endpointID)
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) buildRequestDetailData(req *store.Request) *requestDetailData {
+	headers := parseRequestHeaders(req.ID, req.Headers)
+	headersJSON, _ := json.MarshalIndent(headers, "", "  ")
+
+	contentType := normalizeContentType(headerValue(headers, "Content-Type"))
+	if contentType == "" {
+		contentType = "text/plain"
+	}
+
+	displayBody := req.Body
+	notices := []string{}
+
+	contentEncoding := strings.TrimSpace(headerValue(headers, "Content-Encoding"))
+	if contentEncoding != "" {
+		decoded, truncated, err := decodeBodyForDisplay(req.Body, contentEncoding, maxDecodedDisplaySize)
+		if err == nil {
+			displayBody = decoded
+			notices = append(notices, "Decoded "+contentEncoding+" payload for display.")
+			if truncated {
+				notices = append(notices, "Decoded body view is truncated for performance.")
+			}
+		} else {
+			notices = append(notices, "Showing raw "+contentEncoding+" payload (decode failed).")
+		}
+	}
+
+	if strings.EqualFold(strings.TrimSpace(headerValue(headers, "X-Pipehook-Body-Truncated")), "true") {
+		limit := strings.TrimSpace(headerValue(headers, "X-Pipehook-Body-Limit"))
+		if limit != "" {
+			notices = append(notices, "Stored body was truncated at "+limit+" bytes.")
+		} else {
+			notices = append(notices, "Stored body was truncated at capture time.")
+		}
+	}
+
+	isBinary := isBinaryBody(displayBody, contentType)
+	bodyString := ""
+	bodyHex := ""
+
+	if isBinary {
+		hexBytes := displayBody
+		if len(hexBytes) > maxDisplayHexBytes {
+			hexBytes = hexBytes[:maxDisplayHexBytes]
+			notices = append(notices, "Showing first 65536 bytes as hex.")
+		}
+		bodyHex = hex.Dump(hexBytes)
+	} else {
+		textBytes := displayBody
+		if len(textBytes) > maxDisplayTextBytes {
+			textBytes = textBytes[:maxDisplayTextBytes]
+			notices = append(notices, "Showing first 262144 bytes in viewer.")
+		}
+		bodyString = string(textBytes)
+	}
+
+	return &requestDetailData{
+		Request:       req,
+		HeadersMap:    headers,
+		HeadersJSON:   string(headersJSON),
+		BodyString:    bodyString,
+		BodyHex:       bodyHex,
+		ContentType:   contentType,
+		IsBinary:      isBinary,
+		DisplayNotice: strings.Join(notices, " "),
+	}
+}
+
+func parseRequestHeaders(requestID int64, rawHeaders string) map[string][]string {
+	headers := make(map[string][]string)
+	if strings.TrimSpace(rawHeaders) == "" {
+		return headers
+	}
+
+	if err := json.Unmarshal([]byte(rawHeaders), &headers); err == nil {
+		return headers
+	}
+
+	legacyHeaders := make(map[string]string)
+	if err := json.Unmarshal([]byte(rawHeaders), &legacyHeaders); err == nil {
+		for k, v := range legacyHeaders {
+			headers[k] = []string{v}
+		}
+		return headers
+	}
+
+	log.Printf("Warning: Failed to parse headers for request %d", requestID)
+	return headers
+}
+
+func headerValue(headers map[string][]string, key string) string {
+	for k, values := range headers {
+		if strings.EqualFold(k, key) && len(values) > 0 {
+			return values[0]
+		}
+	}
+	return ""
+}
+
+func normalizeContentType(contentType string) string {
+	contentType = strings.TrimSpace(contentType)
+	if contentType == "" {
+		return ""
+	}
+
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err == nil {
+		return strings.TrimSpace(mediaType)
+	}
+
+	if idx := strings.Index(contentType, ";"); idx > 0 {
+		contentType = contentType[:idx]
+	}
+	return strings.TrimSpace(contentType)
+}
+
+func isBinaryBody(body []byte, contentType string) bool {
+	if len(body) == 0 {
+		return false
+	}
+
+	ct := strings.ToLower(strings.TrimSpace(contentType))
+	isTextType := strings.HasPrefix(ct, "text/") ||
+		strings.Contains(ct, "json") ||
+		strings.Contains(ct, "xml") ||
+		strings.Contains(ct, "html") ||
+		strings.Contains(ct, "javascript") ||
+		strings.Contains(ct, "form-urlencoded")
+
+	sampleSize := len(body)
+	if sampleSize > 1000 {
+		sampleSize = 1000
+	}
+
+	nonPrintableCount := 0
+	for i := 0; i < sampleSize; i++ {
+		b := body[i]
+		if b < 32 && b != 9 && b != 10 && b != 13 && b != 27 {
+			nonPrintableCount++
+		}
+	}
+
+	threshold := 0.25
+	if isTextType {
+		threshold = 0.50
+	}
+	return float64(nonPrintableCount)/float64(sampleSize) > threshold
+}
+
+func decodeBodyForDisplay(body []byte, contentEncoding string, maxBytes int) ([]byte, bool, error) {
+	encodings := strings.Split(strings.ToLower(contentEncoding), ",")
+	decoded := body
+	wasTruncated := false
+
+	for i := len(encodings) - 1; i >= 0; i-- {
+		encoding := strings.TrimSpace(encodings[i])
+		if encoding == "" || encoding == "identity" {
+			continue
+		}
+
+		var (
+			reader io.ReadCloser
+			err    error
+		)
+
+		switch encoding {
+		case "gzip":
+			reader, err = gzip.NewReader(bytes.NewReader(decoded))
+		case "deflate":
+			reader, err = zlib.NewReader(bytes.NewReader(decoded))
+		default:
+			return body, false, fmt.Errorf("unsupported content-encoding %q", encoding)
+		}
+		if err != nil {
+			return body, false, err
+		}
+
+		nextBody, truncated, readErr := readLimited(reader, maxBytes)
+		_ = reader.Close()
+		if readErr != nil {
+			return body, false, readErr
+		}
+		if truncated {
+			wasTruncated = true
+		}
+		decoded = nextBody
+	}
+
+	return decoded, wasTruncated, nil
+}
+
+func readLimited(r io.Reader, limit int) ([]byte, bool, error) {
+	limited := &io.LimitedReader{R: r, N: int64(limit) + 1}
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(data) > limit {
+		return data[:limit], true, nil
+	}
+	return data, false, nil
 }

@@ -20,6 +20,8 @@ func (h *Handler) WebSocket(w http.ResponseWriter, r *http.Request) {
 		log.Printf("websocket upgrade error: %v", err)
 		return
 	}
+	// We don't consume application payloads from clients, so keep inbound frame size tiny.
+	conn.SetReadLimit(1024)
 
 	// Add connection to clients
 	h.clientsMu.Lock()

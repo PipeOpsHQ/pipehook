@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 	"text/template"
+	"time"
 
 	"github.com/PipeOpsHQ/pipehook/internal/store"
 	"github.com/PipeOpsHQ/pipehook/ui"
@@ -95,10 +96,10 @@ func (h *Handler) Broadcast(endpointID string, req *store.Request) {
 	}
 
 	clients := h.clients[endpointID]
-	log.Printf("Broadcasting to %d WebSocket clients for endpoint %s", len(clients), endpointID)
 
 	for i := len(clients) - 1; i >= 0; i-- {
 		conn := clients[i]
+		_ = conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		if err := conn.WriteJSON(map[string]interface{}{
 			"type":    "new-request",
 			"payload": buf.String(),
