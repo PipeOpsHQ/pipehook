@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
@@ -105,15 +104,6 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	type requestDetailData struct {
-		*store.Request
-		HeadersMap  map[string][]string
-		HeadersJSON string
-		BodyString  string
-		ContentType string
-		IsBinary    bool
-	}
-
 	var firstRequest *requestDetailData
 	if len(requests) > 0 {
 		fullRequest, err := h.Store.GetRequest(r.Context(), requests[0].ID)
@@ -122,76 +112,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if fullRequest != nil {
-			var headers map[string][]string
-			// Initialize headers map to avoid nil pointer issues
-			headers = make(map[string][]string)
-
-			// Safely unmarshal headers JSON
-			if fullRequest.Headers != "" {
-				if err := json.Unmarshal([]byte(fullRequest.Headers), &headers); err != nil {
-					log.Printf("Warning: Failed to unmarshal headers for request %d: %v", requests[0].ID, err)
-					// Continue with empty headers map
-					headers = make(map[string][]string)
-				}
-			}
-
-			// Format headers as JSON for display
-			headersJSON, _ := json.MarshalIndent(headers, "", "  ")
-
-			// Detect content type
-			contentType := "text/plain"
-			if ct, ok := headers["Content-Type"]; ok && len(ct) > 0 {
-				contentType = ct[0]
-				if idx := strings.Index(contentType, ";"); idx != -1 {
-					contentType = contentType[:idx]
-				}
-				contentType = strings.TrimSpace(contentType)
-			}
-
-			// Check if binary (only if significant portion is non-printable)
-			isBinary := false
-			if len(fullRequest.Body) > 0 {
-				// If Content-Type suggests text/json, be extremely lenient
-				isTextType := false
-				ct := strings.ToLower(contentType)
-				if strings.Contains(ct, "json") || strings.Contains(ct, "text") || strings.Contains(ct, "xml") || strings.Contains(ct, "html") || strings.Contains(ct, "form-urlencoded") {
-					isTextType = true
-				}
-
-				nonPrintableCount := 0
-				sampleSize := len(fullRequest.Body)
-				if sampleSize > 1000 {
-					sampleSize = 1000 // Sample first 1000 bytes for performance
-				}
-				for i := 0; i < sampleSize; i++ {
-					b := fullRequest.Body[i]
-					// Allow common control characters: 9 (tab), 10 (LF), 13 (CR), 27 (ESC/ANSI)
-					if b < 32 && b != 9 && b != 10 && b != 13 && b != 27 {
-						nonPrintableCount++
-					}
-				}
-
-				// Thresholds:
-				// If text type: 50% non-printable to consider binary (very lenient)
-				// If unknown: 25% non-printable
-				threshold := 0.25
-				if isTextType {
-					threshold = 0.50
-				}
-
-				if sampleSize > 0 && float64(nonPrintableCount)/float64(sampleSize) > threshold {
-					isBinary = true
-				}
-			}
-
-			firstRequest = &requestDetailData{
-				Request:     fullRequest,
-				HeadersMap:  headers,
-				HeadersJSON: string(headersJSON),
-				BodyString:  string(fullRequest.Body),
-				ContentType: contentType,
-				IsBinary:    isBinary,
-			}
+			firstRequest = h.buildRequestDetailData(fullRequest)
 		}
 	}
 
@@ -308,87 +229,11 @@ func (h *Handler) RequestDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var headers map[string][]string
-	// Initialize headers map to avoid nil pointer issues
-	headers = make(map[string][]string)
-
-	// Safely unmarshal headers JSON
-	if req.Headers != "" {
-		if err := json.Unmarshal([]byte(req.Headers), &headers); err != nil {
-			log.Printf("Warning: Failed to unmarshal headers for request %d: %v", req.ID, err)
-			// Continue with empty headers map
-			headers = make(map[string][]string)
-		}
+	data := h.buildRequestDetailData(req)
+	if err := detailTemplate.ExecuteTemplate(w, "request-detail", data); err != nil {
+		log.Printf("template execution error: %v", err)
+		http.Error(w, "failed to render request", http.StatusInternalServerError)
 	}
-
-	// Format headers as JSON for display
-	headersJSON, _ := json.MarshalIndent(headers, "", "  ")
-
-	// Detect content type from headers
-	contentType := "text/plain"
-	if ct, ok := headers["Content-Type"]; ok && len(ct) > 0 {
-		contentType = ct[0]
-		// Extract just the MIME type (remove charset, etc.)
-		if idx := strings.Index(contentType, ";"); idx != -1 {
-			contentType = contentType[:idx]
-		}
-		contentType = strings.TrimSpace(contentType)
-	}
-
-	// Check if body is binary (non-printable characters)
-	// Only consider it binary if a significant portion is non-printable
-	isBinary := false
-	if len(req.Body) > 0 {
-		// If Content-Type suggests text/json, be extremely lenient
-		isTextType := false
-		ct := strings.ToLower(contentType)
-		if strings.Contains(ct, "json") || strings.Contains(ct, "text") || strings.Contains(ct, "xml") || strings.Contains(ct, "html") || strings.Contains(ct, "form-urlencoded") {
-			isTextType = true
-		}
-
-		nonPrintableCount := 0
-		sampleSize := len(req.Body)
-		if sampleSize > 1000 {
-			sampleSize = 1000 // Sample first 1000 bytes for performance
-		}
-		for i := 0; i < sampleSize; i++ {
-			b := req.Body[i]
-			// Allow common control characters: 9 (tab), 10 (LF), 13 (CR), 27 (ESC/ANSI)
-			if b < 32 && b != 9 && b != 10 && b != 13 && b != 27 {
-				nonPrintableCount++
-			}
-		}
-
-		// Thresholds:
-		// If text type: 50% non-printable to consider binary (very lenient)
-		// If unknown: 25% non-printable
-		threshold := 0.25
-		if isTextType {
-			threshold = 0.50
-		}
-
-		if sampleSize > 0 && float64(nonPrintableCount)/float64(sampleSize) > threshold {
-			isBinary = true
-		}
-	}
-
-	data := struct {
-		*store.Request
-		HeadersMap  map[string][]string
-		HeadersJSON string
-		BodyString  string
-		ContentType string
-		IsBinary    bool
-	}{
-		Request:     req,
-		HeadersMap:  headers,
-		HeadersJSON: string(headersJSON),
-		BodyString:  string(req.Body),
-		ContentType: contentType,
-		IsBinary:    isBinary,
-	}
-
-	detailTemplate.ExecuteTemplate(w, "request-detail", data)
 }
 
 func (h *Handler) DeleteRequest(w http.ResponseWriter, r *http.Request) {

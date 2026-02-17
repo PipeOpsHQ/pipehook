@@ -2,10 +2,10 @@ package handler
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/PipeOpsHQ/pipehook/internal/store"
@@ -30,15 +30,9 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	if maxBodyBytes <= 0 {
 		maxBodyBytes = 2 * 1024 * 1024
 	}
-	limitedBody := http.MaxBytesReader(w, r.Body, maxBodyBytes)
-	body, err := io.ReadAll(limitedBody)
-	_ = limitedBody.Close()
+
+	body, wasTruncated, err := readRequestBodyWithLimit(r.Body, maxBodyBytes)
 	if err != nil {
-		var maxErr *http.MaxBytesError
-		if errors.As(err, &maxErr) {
-			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
-			return
-		}
 		log.Printf("Error reading body for %s %s: %v", r.Method, r.URL.Path, err)
 		http.Error(w, "failed to read body", http.StatusInternalServerError)
 		return
@@ -50,7 +44,17 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Capture all headers
-	headersJSON, _ := json.Marshal(r.Header)
+	headersToStore := make(map[string][]string, len(r.Header)+2)
+	for k, values := range r.Header {
+		cloned := make([]string, len(values))
+		copy(cloned, values)
+		headersToStore[k] = cloned
+	}
+	if wasTruncated {
+		headersToStore["X-Pipehook-Body-Truncated"] = []string{"true"}
+		headersToStore["X-Pipehook-Body-Limit"] = []string{strconv.FormatInt(maxBodyBytes, 10)}
+	}
+	headersJSON, _ := json.Marshal(headersToStore)
 
 	req := &store.Request{
 		EndpointID: endpointID,
@@ -79,6 +83,29 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Return success response
+	if wasTruncated {
+		w.Header().Set("X-Pipehook-Body-Truncated", "true")
+	}
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("ok"))
+}
+
+func readRequestBodyWithLimit(body io.ReadCloser, maxBytes int64) ([]byte, bool, error) {
+	defer body.Close()
+	if maxBytes <= 0 {
+		data, err := io.ReadAll(body)
+		return data, false, err
+	}
+
+	limited := &io.LimitedReader{R: body, N: maxBytes + 1}
+	data, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if int64(len(data)) > maxBytes {
+		return data[:int(maxBytes)], true, nil
+	}
+
+	return data, false, nil
 }
