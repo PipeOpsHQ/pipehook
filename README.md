@@ -16,6 +16,15 @@ go run cmd/server/main.go
 ```
 The server will be available at `https://localhost:8080`.
 
+## Frontend Styles
+
+The compiled Tailwind stylesheet is embedded in the Go binary. After changing template classes, rebuild it with:
+
+```bash
+npm install
+npm run build:css
+```
+
 ## Running with Docker
 
 You can use the pre-built image from GitHub Container Registry:

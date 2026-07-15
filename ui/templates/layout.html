@@ -6,11 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PipeHooks</title>
     <link rel="icon" type="image/svg+xml" href="/static/pipehook.svg">
+    <link rel="stylesheet" href="/static/app.css">
     <!-- Alpine.js for lightweight interactivity (optional, add if needed) -->
     <!-- <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script> -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/sse.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -29,16 +29,6 @@
         }
     </style>
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: { 500: '#3b82f6', 600: '#2563eb' },
-                    }
-                }
-            }
-        }
-
         // Removed localStorage-based recents - using database as single source of truth
 
         function formatTimeAgo(timestamp) {
