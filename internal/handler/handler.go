@@ -2,6 +2,8 @@ package handler
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"html/template"
 	"log"
 	"net/http"
@@ -23,9 +25,19 @@ type BaseTemplateData struct {
 
 // Template functions
 var funcMap = template.FuncMap{
-	"sub": func(a, b int) int { return a - b },
-	"add": func(a, b int) int { return a + b },
+	"sub":          func(a, b int) int { return a - b },
+	"add":          func(a, b int) int { return a + b },
+	"assetVersion": func() string { return appCSSVersion },
 }
+
+var appCSSVersion = func() string {
+	stylesheet, err := ui.FS.ReadFile("static/app.css")
+	if err != nil {
+		return "unknown"
+	}
+	sum := sha256.Sum256(stylesheet)
+	return hex.EncodeToString(sum[:8])
+}()
 
 var (
 	homeTemplate      = template.Must(template.New("").Funcs(funcMap).ParseFS(ui.FS, "templates/layout.html", "templates/home.html"))

@@ -113,8 +113,16 @@ func main() {
 		})
 	})
 
-	// Static files (must be before catch-all routes)
-	r.Handle("/static/*", http.FileServer(http.FS(ui.FS)))
+	// Versioned assets are immutable; unversioned assets must revalidate after deploys.
+	staticFiles := http.FileServer(http.FS(ui.FS))
+	r.Handle("/static/*", http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.URL.Query().Get("v") != "" {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
+		staticFiles.ServeHTTP(w, request)
+	}))
 	r.Get("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/static/pipehook.svg", http.StatusMovedPermanently)
 	})

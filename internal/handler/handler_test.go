@@ -150,3 +150,16 @@ func TestBroadcastDoesNotRetainEmptyEndpoint(t *testing.T) {
 		t.Fatalf("empty websocket endpoint was retained: %+v", handler.clients)
 	}
 }
+
+func TestLayoutUsesContentVersionedStylesheet(t *testing.T) {
+	handler, _ := testHandler(t)
+	response := httptest.NewRecorder()
+	handler.Home(response, httptest.NewRequest(http.MethodGet, "/", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("home failed with %d: %s", response.Code, response.Body.String())
+	}
+	want := "/static/app.css?v=" + appCSSVersion
+	if appCSSVersion == "unknown" || !strings.Contains(response.Body.String(), want) {
+		t.Fatalf("layout does not use versioned stylesheet %q", want)
+	}
+}

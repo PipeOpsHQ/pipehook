@@ -34,7 +34,7 @@
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
             <div class="bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-2">
                 <p class="text-[9px] uppercase tracking-wider text-slate-600">Origin</p>
-                <p class="text-[11px] font-mono text-slate-300 truncate">{{ .Scheme }}://{{ .Host }}</p>
+                <p class="text-[11px] font-mono text-slate-300 truncate">{{ if and .Scheme .Host }}{{ .Scheme }}://{{ .Host }}{{ else }}Not recorded{{ end }}</p>
             </div>
             <div class="bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-2">
                 <p class="text-[9px] uppercase tracking-wider text-slate-600">Remote address</p>
