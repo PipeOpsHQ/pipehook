@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/PipeOpsHQ/pipehook/internal/handler"
@@ -50,45 +54,16 @@ func main() {
 		dbPath = "webhook.db"
 	}
 
-	// Ensure the directory exists and is writable
-	dbDir := "."
-	if strings.Contains(dbPath, "/") {
-		parts := strings.Split(dbPath, "/")
-		dbDir = strings.Join(parts[:len(parts)-1], "/")
-	}
-
-	log.Printf("Checking database directory: %s", dbDir)
-	if _, err := os.Stat(dbDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(dbDir, 0777); err != nil {
-			log.Printf("Warning: failed to create database directory: %v", err)
-		}
-	} else {
-		// Attempt to make directory writable just in case
-		os.Chmod(dbDir, 0777)
-	}
-
-	// If database file exists, check its permissions
-	if _, err := os.Stat(dbPath); err == nil {
-		log.Printf("Database file exists, attempting to ensure it is writable...")
-		if err := os.Chmod(dbPath, 0666); err != nil {
-			log.Printf("Warning: could not chmod database file: %v", err)
-		}
-	}
-
-	// Test if directory is writable
-	testFile := dbDir + "/.write_test"
-	if err := os.WriteFile(testFile, []byte("test"), 0666); err != nil {
-		log.Printf("CRITICAL: Database directory %s is NOT writable: %v", dbDir, err)
-		log.Printf("Current User ID: %d, Group ID: %d", os.Getuid(), os.Getgid())
-	} else {
-		os.Remove(testFile)
-		log.Printf("Database directory %s is writable", dbDir)
+	dbDir := filepath.Dir(dbPath)
+	if err := os.MkdirAll(dbDir, 0750); err != nil {
+		log.Fatalf("create database directory %s: %v", dbDir, err)
 	}
 
 	s, err := store.NewSQLiteStore(dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer s.Close()
 
 	h := handler.NewHandler(s)
 
@@ -111,11 +86,17 @@ func main() {
 	// Set admin credentials in handler so it can check authentication
 	h.AdminUsername = adminUsername
 	h.AdminPassword = adminPassword
+	h.APIKey = strings.TrimSpace(os.Getenv("API_KEY"))
+	allowPrivateForward, _ := strconv.ParseBool(os.Getenv("ALLOW_PRIVATE_FORWARDING"))
+	h.SetAllowPrivateForwarding(allowPrivateForward)
 
 	if adminUsername != "" && adminPassword != "" {
 		log.Printf("Admin authentication enabled for /admin endpoint")
 	} else {
-		log.Printf("WARNING: Admin authentication is disabled. Set ADMIN_USERNAME and ADMIN_PASSWORD environment variables to protect the admin endpoint.")
+		log.Printf("WARNING: Admin routes are unavailable until ADMIN_USERNAME and ADMIN_PASSWORD are configured.")
+	}
+	if h.APIKey == "" {
+		log.Printf("API routes are unavailable until API_KEY is configured.")
 	}
 
 	r := chi.NewRouter()
@@ -146,6 +127,8 @@ func main() {
 	r.Delete("/r/{requestID}", h.DeleteRequest)
 	r.Delete("/endpoint/{endpointID}", h.DeleteEndpoint)
 	r.Post("/endpoint/{endpointID}/settings", h.UpdateEndpointSettings)
+	r.Get("/endpoint/{endpointID}/export.json", h.ExportRequestsJSON)
+	r.Get("/endpoint/{endpointID}/export.csv", h.ExportRequestsCSV)
 	r.Get("/ws/{endpointID}", h.WebSocket)
 	r.Get("/{endpointID}/more", h.LoadMoreRequests)
 	r.Get("/{endpointID}", h.Dashboard)
@@ -155,6 +138,18 @@ func main() {
 		r.Use(handler.BasicAuthMiddleware(adminUsername, adminPassword))
 		r.Get("/admin", h.AdminPage)
 		r.Delete("/admin/endpoint/{endpointID}", h.AdminDeleteEndpoint)
+	})
+
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(h.APIAuthMiddleware)
+		r.Get("/endpoints", h.APIListEndpoints)
+		r.Post("/endpoints", h.APICreateEndpoint)
+		r.Get("/endpoints/{endpointID}", h.APIGetEndpoint)
+		r.Put("/endpoints/{endpointID}", h.APIUpdateEndpoint)
+		r.Delete("/endpoints/{endpointID}", h.APIDeleteEndpoint)
+		r.Get("/endpoints/{endpointID}/requests", h.APIListRequests)
+		r.Get("/requests/{requestID}", h.APIGetRequest)
+		r.Delete("/requests/{requestID}", h.APIDeleteRequest)
 	})
 
 	// Webhook receiver - accept ALL HTTP methods (GET, POST, PUT, PATCH, DELETE, etc.)
@@ -169,12 +164,20 @@ func main() {
 		r.MethodFunc(method, "/h/{endpointID}/*", h.CaptureWebhook)
 	}
 
-	// Cleanup worker
+	shutdownCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
-		for range ticker.C {
-			if err := s.Cleanup(context.Background()); err != nil {
-				log.Printf("cleanup error: %v", err)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := s.Cleanup(shutdownCtx); err != nil && shutdownCtx.Err() == nil {
+					log.Printf("cleanup error: %v", err)
+				}
+			case <-shutdownCtx.Done():
+				return
 			}
 		}
 	}()
@@ -189,12 +192,20 @@ func main() {
 		Handler:        r,
 		MaxHeaderBytes: 1 << 20, // 1MB max header size
 		ReadTimeout:    30 * time.Second,
-		WriteTimeout:   30 * time.Second,
+		WriteTimeout:   45 * time.Second,
 		IdleTimeout:    120 * time.Second,
 	}
+	go func() {
+		<-shutdownCtx.Done()
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("server shutdown error: %v", err)
+		}
+	}()
 
 	log.Printf("Starting server on :%s", port)
-	if err := srv.ListenAndServe(); err != nil {
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
 }

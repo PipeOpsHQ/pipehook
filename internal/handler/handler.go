@@ -2,10 +2,10 @@ package handler
 
 import (
 	"bytes"
+	"html/template"
 	"log"
 	"net/http"
 	"sync"
-	"text/template"
 	"time"
 
 	"github.com/PipeOpsHQ/pipehook/internal/store"
@@ -37,7 +37,11 @@ var (
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 		CheckOrigin: func(r *http.Request) bool {
-			return true // Allow all origins in development
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				return true
+			}
+			return origin == requestScheme(r)+"://"+r.Host
 		},
 	}
 )
@@ -48,7 +52,13 @@ type Handler struct {
 	clientsMu           sync.RWMutex
 	AdminUsername       string
 	AdminPassword       string
+	APIKey              string
 	MaxWebhookBodyBytes int64
+	AllowPrivateForward bool
+	ForwardClient       *http.Client
+	apiRateMu           sync.Mutex
+	apiRateWindow       time.Time
+	apiRateCount        int
 }
 
 func NewHandler(s store.Store) *Handler {
@@ -56,7 +66,13 @@ func NewHandler(s store.Store) *Handler {
 		Store:               s,
 		clients:             make(map[string][]*websocket.Conn),
 		MaxWebhookBodyBytes: 2 * 1024 * 1024, // 2MB default
+		ForwardClient:       newForwardClient(false),
 	}
+}
+
+func (h *Handler) SetAllowPrivateForwarding(allow bool) {
+	h.AllowPrivateForward = allow
+	h.ForwardClient = newForwardClient(allow)
 }
 
 // GetBrowserID retrieves or creates a browser fingerprint ID from cookies
@@ -87,6 +103,11 @@ func (h *Handler) GetBrowserID(w http.ResponseWriter, r *http.Request) string {
 func (h *Handler) Broadcast(endpointID string, req *store.Request) {
 	h.clientsMu.Lock()
 	defer h.clientsMu.Unlock()
+	clients := h.clients[endpointID]
+	if len(clients) == 0 {
+		delete(h.clients, endpointID)
+		return
+	}
 
 	var buf bytes.Buffer
 	err := dashboardTemplate.ExecuteTemplate(&buf, "request-item", req)
@@ -94,8 +115,6 @@ func (h *Handler) Broadcast(endpointID string, req *store.Request) {
 		log.Printf("Broadcast template error: %v", err)
 		return
 	}
-
-	clients := h.clients[endpointID]
 
 	for i := len(clients) - 1; i >= 0; i-- {
 		conn := clients[i]
@@ -110,7 +129,11 @@ func (h *Handler) Broadcast(endpointID string, req *store.Request) {
 			conn.Close()
 		}
 	}
-	h.clients[endpointID] = clients
+	if len(clients) == 0 {
+		delete(h.clients, endpointID)
+	} else {
+		h.clients[endpointID] = clients
+	}
 }
 
 func (h *Handler) closeEndpointConnections(endpointID string) {

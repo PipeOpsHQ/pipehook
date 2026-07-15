@@ -2,66 +2,47 @@ package handler
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 )
 
 func (h *Handler) ReplayRequest(w http.ResponseWriter, r *http.Request) {
-	idStr := chi.URLParam(r, "requestID")
-	id, _ := strconv.ParseInt(idStr, 10, 64)
-	reqData, err := h.Store.GetRequest(r.Context(), id)
+	id, err := strconv.ParseInt(chi.URLParam(r, "requestID"), 10, 64)
 	if err != nil {
-		http.Error(w, "request not found", http.StatusNotFound)
+		http.Error(w, "invalid request ID", http.StatusBadRequest)
+		return
+	}
+	captured, ok := h.requireRequestAccess(w, r, id)
+	if !ok {
 		return
 	}
 
-	// Determine the protocol (default to http, but check for https)
-	proto := "http"
-	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
-		proto = "https"
+	target := url.URL{
+		Scheme: requestScheme(r), Host: r.Host, Path: "/h/" + captured.EndpointID + replayRelativePath(captured),
+		RawQuery: captured.QueryString,
 	}
-
-	// Prepare the request to be replayed
-	targetURL := fmt.Sprintf("%s://%s/h/%s%s", proto, r.Host, reqData.EndpointID, reqData.Path)
-
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-	newReq, err := http.NewRequest(reqData.Method, targetURL, bytes.NewReader(reqData.Body))
+	replay, err := http.NewRequestWithContext(r.Context(), captured.Method, target.String(), bytes.NewReader(captured.Body))
 	if err != nil {
 		http.Error(w, "failed to create replay request", http.StatusInternalServerError)
 		return
 	}
+	copyReplayHeaders(replay.Header, captured.Headers)
 
-	// Restore headers
-	var headers map[string][]string
-	if err := json.Unmarshal([]byte(reqData.Headers), &headers); err == nil {
-		for k, v := range headers {
-			for _, val := range v {
-				// Don't replay certain headers that should be unique to the new request
-				kLower := strings.ToLower(k)
-				if kLower == "host" || kLower == "content-length" || kLower == "connection" || kLower == "accept-encoding" {
-					continue
-				}
-				newReq.Header.Add(k, val)
-			}
-		}
-	}
-
-	resp, err := client.Do(newReq)
+	client := &http.Client{Timeout: 10 * time.Second}
+	response, err := client.Do(replay)
 	if err != nil {
-		http.Error(w, "failed to replay request: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed to replay request", http.StatusBadGateway)
 		return
 	}
-	defer resp.Body.Close()
-
+	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 32*1024))
 	w.Header().Set("HX-Trigger", "requestReplayed")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Replayed successfully (Status: %s)", resp.Status)
+	_, _ = fmt.Fprintf(w, "Replayed successfully (Status: %s)", response.Status)
 }

@@ -11,6 +11,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -52,12 +53,14 @@ func (h *Handler) Home(w http.ResponseWriter, r *http.Request) {
 		BaseTemplateData
 		Endpoints []*store.Endpoint
 		Host      string
+		Scheme    string
 	}{
 		BaseTemplateData: BaseTemplateData{
 			IsAdmin: h.IsAdminAuthenticated(r),
 		},
 		Endpoints: endpoints,
 		Host:      r.Host,
+		Scheme:    requestScheme(r),
 	}
 
 	if err := homeTemplate.ExecuteTemplate(w, "layout", data); err != nil {
@@ -98,10 +101,8 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	endpoint, err := h.Store.GetEndpoint(r.Context(), endpointID)
-	if err != nil {
-		log.Printf("Error getting endpoint %s: %v", endpointID, err)
-		http.Error(w, "endpoint not found", http.StatusNotFound)
+	endpoint, ok := h.requireEndpointAccess(w, r, endpointID)
+	if !ok {
 		return
 	}
 
@@ -113,7 +114,11 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	requests, err := h.Store.GetRequestSummaries(r.Context(), endpointID, limit)
+	searchQuery := strings.TrimSpace(r.URL.Query().Get("q"))
+	if len(searchQuery) > 200 {
+		searchQuery = searchQuery[:200]
+	}
+	requests, err := h.Store.SearchRequestSummaries(r.Context(), endpointID, searchQuery, limit, 0)
 	if err != nil {
 		log.Printf("Error getting requests for endpoint %s: %v", endpointID, err)
 		http.Error(w, "failed to fetch requests", http.StatusInternalServerError)
@@ -151,7 +156,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get total count for pagination
-	totalCount, _ := h.Store.CountRequests(r.Context(), endpointID)
+	totalCount, _ := h.Store.CountRequestsFiltered(r.Context(), endpointID, searchQuery)
 	hasMore := len(requests) < totalCount
 
 	data := struct {
@@ -161,9 +166,11 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		FirstRequest   *requestDetailData
 		OtherEndpoints []*store.Endpoint
 		Host           string
+		Scheme         string
 		TotalCount     int
 		HasMore        bool
 		Limit          int
+		SearchQuery    string
 	}{
 		BaseTemplateData: BaseTemplateData{
 			IsAdmin: h.IsAdminAuthenticated(r),
@@ -173,9 +180,11 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		FirstRequest:   firstRequest,
 		OtherEndpoints: otherEndpoints,
 		Host:           host,
+		Scheme:         requestScheme(r),
 		TotalCount:     totalCount,
 		HasMore:        hasMore,
 		Limit:          limit,
+		SearchQuery:    searchQuery,
 	}
 
 	if err := dashboardTemplate.ExecuteTemplate(w, "layout", data); err != nil {
@@ -193,6 +202,9 @@ func (h *Handler) LoadMoreRequests(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing endpoint ID", http.StatusBadRequest)
 		return
 	}
+	if _, ok := h.requireEndpointAccess(w, r, endpointID); !ok {
+		return
+	}
 
 	// Parse offset and limit from query params
 	offset := 0
@@ -208,14 +220,18 @@ func (h *Handler) LoadMoreRequests(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	requests, err := h.Store.GetRequestSummariesWithOffset(r.Context(), endpointID, limit, offset)
+	searchQuery := strings.TrimSpace(r.URL.Query().Get("q"))
+	if len(searchQuery) > 200 {
+		searchQuery = searchQuery[:200]
+	}
+	requests, err := h.Store.SearchRequestSummaries(r.Context(), endpointID, searchQuery, limit, offset)
 	if err != nil {
 		http.Error(w, "failed to fetch requests", http.StatusInternalServerError)
 		return
 	}
 
 	// Get total count to determine if there's more
-	totalCount, _ := h.Store.CountRequests(r.Context(), endpointID)
+	totalCount, _ := h.Store.CountRequestsFiltered(r.Context(), endpointID, searchQuery)
 	hasMore := (offset + len(requests)) < totalCount
 
 	// Render request items as HTML fragments
@@ -232,7 +248,7 @@ func (h *Handler) LoadMoreRequests(w http.ResponseWriter, r *http.Request) {
 	if hasMore {
 		nextOffset := offset + len(requests)
 		buf.WriteString(`<li id="load-more-container" class="p-4 text-center">
-			<button hx-get="/` + endpointID + `/more?offset=` + strconv.Itoa(nextOffset) + `&limit=` + strconv.Itoa(limit) + `"
+			<button hx-get="/` + endpointID + `/more?offset=` + strconv.Itoa(nextOffset) + `&limit=` + strconv.Itoa(limit) + `&q=` + url.QueryEscape(searchQuery) + `"
 					hx-target="#load-more-container"
 					hx-swap="outerHTML"
 					class="text-xs font-bold text-brand-400 hover:text-brand-300 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition-all">
@@ -247,10 +263,13 @@ func (h *Handler) LoadMoreRequests(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) RequestDetail(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "requestID")
-	id, _ := strconv.ParseInt(idStr, 10, 64)
-	req, err := h.Store.GetRequest(r.Context(), id)
+	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		http.Error(w, "request not found", http.StatusNotFound)
+		http.Error(w, "invalid request ID", http.StatusBadRequest)
+		return
+	}
+	req, ok := h.requireRequestAccess(w, r, id)
+	if !ok {
 		return
 	}
 
@@ -269,10 +288,7 @@ func (h *Handler) DeleteRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify request exists
-	_, err = h.Store.GetRequest(r.Context(), id)
-	if err != nil {
-		http.Error(w, "request not found", http.StatusNotFound)
+	if _, ok := h.requireRequestAccess(w, r, id); !ok {
 		return
 	}
 
@@ -293,18 +309,7 @@ func (h *Handler) DeleteEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	browserID := h.GetBrowserID(w, r)
-
-	// Verify endpoint exists
-	endpoint, err := h.Store.GetEndpoint(r.Context(), endpointID)
-	if err != nil {
-		http.Error(w, "endpoint not found", http.StatusNotFound)
-		return
-	}
-
-	// Endpoint owners can delete their own endpoints, and admins can delete any endpoint.
-	if endpoint.CreatorID != "" && endpoint.CreatorID != browserID && !h.IsAdminAuthenticated(r) {
-		http.Error(w, "unauthorized", http.StatusForbidden)
+	if _, ok := h.requireEndpointAccess(w, r, endpointID); !ok {
 		return
 	}
 
@@ -326,23 +331,11 @@ func (h *Handler) UpdateEndpointSettings(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Get browser ID
-	browserID := h.GetBrowserID(w, r)
-
-	// Verify endpoint exists and belongs to this user
-	endpoint, err := h.Store.GetEndpoint(r.Context(), endpointID)
-	if err != nil {
-		http.Error(w, "endpoint not found", http.StatusNotFound)
+	if _, ok := h.requireEndpointAccess(w, r, endpointID); !ok {
 		return
 	}
 
-	// Check ownership
-	if endpoint.CreatorID != "" && endpoint.CreatorID != browserID {
-		http.Error(w, "unauthorized", http.StatusForbidden)
-		return
-	}
-
-	// Parse form data
+	r.Body = http.MaxBytesReader(w, r.Body, 128*1024)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "invalid form data", http.StatusBadRequest)
 		return
@@ -366,11 +359,42 @@ func (h *Handler) UpdateEndpointSettings(w http.ResponseWriter, r *http.Request)
 		ttl = store.DefaultTTL
 	}
 
-	// Update endpoint
-	if err := h.Store.UpdateEndpoint(r.Context(), endpointID, alias, ttl); err != nil {
+	defaultStatus, err := strconv.Atoi(r.FormValue("default_status"))
+	if err != nil {
+		http.Error(w, "invalid response status", http.StatusBadRequest)
+		return
+	}
+	responseDelay, err := strconv.Atoi(r.FormValue("response_delay_ms"))
+	if err != nil {
+		http.Error(w, "invalid response delay", http.StatusBadRequest)
+		return
+	}
+	requestLimit, err := strconv.Atoi(r.FormValue("request_limit"))
+	if err != nil {
+		http.Error(w, "invalid request limit", http.StatusBadRequest)
+		return
+	}
+	contentType := strings.TrimSpace(r.FormValue("default_content_type"))
+	if contentType == "" {
+		contentType = store.DefaultResponseContentType
+	}
+	settings := store.EndpointSettings{
+		Alias: alias, TTL: ttl, DefaultStatus: defaultStatus, DefaultBody: r.FormValue("default_body"),
+		DefaultContentType: contentType, ResponseDelayMS: responseDelay,
+		EnableCORS: r.FormValue("enable_cors") == "on", ForwardURL: strings.TrimSpace(r.FormValue("forward_url")),
+		RequestLimit: requestLimit,
+	}
+	if err := validateEndpointSettings(settings); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := h.Store.UpdateEndpointSettings(r.Context(), endpointID, settings); err != nil {
 		log.Printf("Error updating endpoint %s: %v", endpointID, err)
 		http.Error(w, "failed to update endpoint", http.StatusInternalServerError)
 		return
+	}
+	if err := h.Store.TrimRequests(r.Context(), endpointID, settings.RequestLimit); err != nil {
+		log.Printf("Error applying request limit to endpoint %s: %v", endpointID, err)
 	}
 
 	// Return success with HX-Trigger to refresh the page
@@ -405,7 +429,7 @@ func (h *Handler) buildRequestDetailData(req *store.Request) *requestDetailData 
 		}
 	}
 
-	if strings.EqualFold(strings.TrimSpace(headerValue(headers, "X-Pipehook-Body-Truncated")), "true") {
+	if req.BodyTruncated || strings.EqualFold(strings.TrimSpace(headerValue(headers, "X-Pipehook-Body-Truncated")), "true") {
 		limit := strings.TrimSpace(headerValue(headers, "X-Pipehook-Body-Limit"))
 		if limit != "" {
 			notices = append(notices, "Stored body was truncated at "+limit+" bytes.")

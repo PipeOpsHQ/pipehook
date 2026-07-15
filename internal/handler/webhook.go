@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
+	"time"
 
 	"github.com/PipeOpsHQ/pipehook/internal/store"
 	"github.com/go-chi/chi/v5"
@@ -18,10 +18,8 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing endpoint ID", http.StatusBadRequest)
 		return
 	}
-
-	// Check if endpoint exists
-	_, err := h.Store.GetEndpoint(r.Context(), endpointID)
-	if err != nil {
+	endpoint, err := h.Store.GetEndpoint(r.Context(), endpointID)
+	if err != nil || endpoint.ExpiresAt.Before(time.Now()) {
 		http.Error(w, "endpoint not found", http.StatusNotFound)
 		return
 	}
@@ -30,7 +28,6 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	if maxBodyBytes <= 0 {
 		maxBodyBytes = 2 * 1024 * 1024
 	}
-
 	body, wasTruncated, err := readRequestBodyWithLimit(r.Body, maxBodyBytes)
 	if err != nil {
 		log.Printf("Error reading body for %s %s: %v", r.Method, r.URL.Path, err)
@@ -38,17 +35,9 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contentType := strings.ToLower(strings.TrimSpace(r.Header.Get("Content-Type")))
-	if len(body) == 0 && strings.HasPrefix(contentType, "application/x-www-form-urlencoded") && r.URL.RawQuery != "" {
-		body = []byte(r.URL.RawQuery)
-	}
-
-	// Capture all headers
 	headersToStore := make(map[string][]string, len(r.Header)+2)
-	for k, values := range r.Header {
-		cloned := make([]string, len(values))
-		copy(cloned, values)
-		headersToStore[k] = cloned
+	for key, values := range r.Header {
+		headersToStore[key] = append([]string(nil), values...)
 	}
 	if wasTruncated {
 		headersToStore["X-Pipehook-Body-Truncated"] = []string{"true"}
@@ -56,38 +45,52 @@ func (h *Handler) CaptureWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	headersJSON, _ := json.Marshal(headersToStore)
 
-	req := &store.Request{
-		EndpointID: endpointID,
-		Method:     r.Method,
-		Path:       r.URL.Path,
-		RemoteAddr: r.RemoteAddr,
-		Headers:    string(headersJSON),
-		Body:       body,
-		StatusCode: http.StatusOK,
+	captured := &store.Request{
+		EndpointID: endpointID, Method: r.Method, Path: r.URL.Path, QueryString: r.URL.RawQuery,
+		Host: r.Host, Scheme: requestScheme(r), RemoteAddr: r.RemoteAddr, Headers: string(headersJSON),
+		Body: body, ContentLength: r.ContentLength, BodyTruncated: wasTruncated, StatusCode: responseStatus(endpoint),
 	}
-
-	if err := h.Store.SaveRequest(r.Context(), req); err != nil {
+	if err := h.Store.SaveRequest(r.Context(), captured); err != nil {
 		log.Printf("Error saving request: %v", err)
 		http.Error(w, "failed to save request", http.StatusInternalServerError)
 		return
 	}
+	if err := h.Store.TrimRequests(r.Context(), endpointID, endpoint.RequestLimit); err != nil {
+		log.Printf("Error enforcing request retention for %s: %v", endpointID, err)
+	}
 
-	// Broadcast only list-relevant fields to avoid carrying large bodies through the websocket path.
 	h.Broadcast(endpointID, &store.Request{
-		ID:         req.ID,
-		EndpointID: req.EndpointID,
-		Method:     req.Method,
-		Path:       req.Path,
-		RemoteAddr: req.RemoteAddr,
-		CreatedAt:  req.CreatedAt,
+		ID: captured.ID, EndpointID: captured.EndpointID, Method: captured.Method, Path: captured.Path,
+		QueryString: captured.QueryString, RemoteAddr: captured.RemoteAddr, CreatedAt: captured.CreatedAt,
 	})
+	if endpoint.ForwardURL != "" {
+		if err := h.forwardRequest(r.Context(), endpoint, captured); err != nil {
+			log.Printf("Forwarding request %d failed: %v", captured.ID, err)
+		}
+	}
 
-	// Return success response
+	if endpoint.EnableCORS {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD")
+	}
+	if endpoint.DefaultContentType != "" {
+		w.Header().Set("Content-Type", endpoint.DefaultContentType)
+	}
 	if wasTruncated {
 		w.Header().Set("X-Pipehook-Body-Truncated", "true")
 	}
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("ok"))
+	if endpoint.ResponseDelayMS > 0 {
+		select {
+		case <-time.After(time.Duration(endpoint.ResponseDelayMS) * time.Millisecond):
+		case <-r.Context().Done():
+			return
+		}
+	}
+	w.WriteHeader(responseStatus(endpoint))
+	if r.Method != http.MethodHead {
+		_, _ = w.Write([]byte(endpoint.DefaultBody))
+	}
 }
 
 func readRequestBodyWithLimit(body io.ReadCloser, maxBytes int64) ([]byte, bool, error) {
@@ -96,16 +99,13 @@ func readRequestBodyWithLimit(body io.ReadCloser, maxBytes int64) ([]byte, bool,
 		data, err := io.ReadAll(body)
 		return data, false, err
 	}
-
 	limited := &io.LimitedReader{R: body, N: maxBytes + 1}
 	data, err := io.ReadAll(limited)
 	if err != nil {
 		return nil, false, err
 	}
-
 	if int64(len(data)) > maxBytes {
 		return data[:int(maxBytes)], true, nil
 	}
-
 	return data, false, nil
 }

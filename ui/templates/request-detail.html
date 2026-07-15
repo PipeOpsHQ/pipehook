@@ -4,7 +4,7 @@
     <div class="px-4 py-2 border-b border-slate-800 bg-slate-900/40 flex items-center justify-between shrink-0">
         <div class="flex items-center gap-3 min-w-0">
             <span class="text-xs font-bold {{ if eq .Method "GET" }}text-emerald-500{{ else }}text-brand-400{{ end }} font-mono bg-slate-900/50 px-1.5 py-0.5 rounded border border-slate-800/50">{{ .Method }}</span>
-            <span class="text-xs text-slate-200 font-mono truncate max-w-xl">{{ .Path }}</span>
+            <span class="text-xs text-slate-200 font-mono truncate max-w-xl">{{ .Path }}{{ if .QueryString }}?{{ .QueryString }}{{ end }}</span>
         </div>
         <div class="flex items-center gap-1.5">
             <button class="text-[10px] font-bold text-white bg-brand-600 hover:bg-brand-500 px-2.5 py-1 rounded-md transition-all active:scale-95 flex items-center gap-1.5 shadow-lg shadow-brand-600/5"
@@ -31,6 +31,24 @@
 
     <!-- Scrollable Content -->
     <div class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            <div class="bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-2">
+                <p class="text-[9px] uppercase tracking-wider text-slate-600">Origin</p>
+                <p class="text-[11px] font-mono text-slate-300 truncate">{{ .Scheme }}://{{ .Host }}</p>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-2">
+                <p class="text-[9px] uppercase tracking-wider text-slate-600">Remote address</p>
+                <p class="text-[11px] font-mono text-slate-300 truncate">{{ .RemoteAddr }}</p>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-2">
+                <p class="text-[9px] uppercase tracking-wider text-slate-600">Content length</p>
+                <p class="text-[11px] font-mono text-slate-300">{{ if lt .ContentLength 0 }}unknown{{ else }}{{ .ContentLength }} bytes{{ end }}</p>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-2">
+                <p class="text-[9px] uppercase tracking-wider text-slate-600">Capture</p>
+                <p class="text-[11px] font-mono {{ if .BodyTruncated }}text-amber-300{{ else }}text-emerald-400{{ end }}">{{ if .BodyTruncated }}Truncated{{ else }}Complete{{ end }}</p>
+            </div>
+        </div>
         <!-- Headers -->
         <div>
             <div class="flex items-center justify-between mb-1.5">

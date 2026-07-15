@@ -22,6 +22,7 @@ cmd/server/server
 
 # Dependency directories
 vendor/
+node_modules/
 
 # Go workspace file
 go.work

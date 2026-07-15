@@ -37,7 +37,7 @@
                             <span class="w-1 h-1 rounded-full bg-slate-700"></span>
                             <span>Expires {{ .ExpiresAt.Format "Jan 02, 2006" }}</span>
                         </div>
-                        <code class="text-[10px] text-slate-600 font-mono mt-1 block truncate">https://{{ $.Host }}/h/{{ .ID }}</code>
+                        <code class="text-[10px] text-slate-600 font-mono mt-1 block truncate">{{ $.Scheme }}://{{ $.Host }}/h/{{ .ID }}</code>
                     </div>
                 </div>
                 <i class="fas fa-chevron-right text-[10px] text-slate-600 group-hover:text-brand-500 transition-colors ml-4 shrink-0"></i>

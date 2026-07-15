@@ -1,12 +1,20 @@
 {{ define "content" }}
-<div class="h-full flex overflow-hidden">
+<div class="h-full flex flex-col md:flex-row overflow-hidden">
     <!-- Compact Request List -->
-    <div class="w-80 lg:w-96 border-r border-slate-800 bg-slate-900/30 flex flex-col shrink-0">
-        <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
-            <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">History</span>
-            <span id="request-count" class="text-xs font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700/50">
-                {{ .TotalCount }}
-            </span>
+    <div class="w-full h-72 md:h-full md:w-80 lg:w-96 border-b md:border-b-0 md:border-r border-slate-800 bg-slate-900/30 flex flex-col shrink-0">
+        <div class="p-4 border-b border-slate-800 bg-slate-900/50 space-y-3">
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">History</span>
+                <span id="request-count" class="text-xs font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded border border-slate-700/50">{{ .TotalCount }}</span>
+            </div>
+            <form method="get" action="/{{ .Endpoint.ID }}" class="flex gap-2">
+                <label class="sr-only" for="request-search">Search requests</label>
+                <input id="request-search" type="search" name="q" value="{{ .SearchQuery }}" placeholder="Method, path, header, body..."
+                       class="min-w-0 flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-brand-500">
+                <button type="submit" class="px-3 py-2 rounded-lg bg-brand-600 hover:bg-brand-500 text-white" title="Search">
+                    <i class="fas fa-search text-[10px]"></i>
+                </button>
+            </form>
         </div>
         <ul id="request-list" class="flex-1 overflow-y-auto custom-scrollbar divide-y divide-slate-800/50">
             {{ range .Requests }}
@@ -14,7 +22,7 @@
             {{ end }}
             {{ if .HasMore }}
             <li id="load-more-container" class="p-4 text-center">
-                <button hx-get="/{{ .Endpoint.ID }}/more?offset={{ len .Requests }}&limit={{ .Limit }}"
+                <button hx-get="/{{ .Endpoint.ID }}/more?offset={{ len .Requests }}&limit={{ .Limit }}&q={{ .SearchQuery | urlquery }}"
                         hx-target="#load-more-container"
                         hx-swap="outerHTML"
                         class="text-xs font-bold text-brand-400 hover:text-brand-300 bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition-all">
@@ -28,7 +36,7 @@
     <!-- Details Area -->
     <div class="flex-1 flex flex-col min-w-0 bg-slate-950">
         <!-- Endpoint Header -->
-        <div id="endpoint-header" class="p-4 border-b border-slate-800 flex items-center justify-between gap-4 bg-slate-900/20" data-endpoint-id="{{ if .Endpoint }}{{ .Endpoint.ID }}{{ end }}">
+        <div id="endpoint-header" class="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4 bg-slate-900/20" data-endpoint-id="{{ if .Endpoint }}{{ .Endpoint.ID }}{{ end }}" data-search-query="{{ .SearchQuery }}">
             <div class="flex items-center gap-4 min-w-0 flex-1">
                 <a href="/" class="text-xs text-slate-500 hover:text-brand-400 transition-colors flex items-center gap-1.5 shrink-0" title="View all endpoints">
                     <i class="fas fa-arrow-left text-[10px]"></i>
@@ -39,7 +47,7 @@
                     {{ if .Endpoint }}
                     <div class="flex items-center gap-2 min-w-0 flex-1">
                         <div id="endpoint-color-dot" class="w-2 h-2 rounded-full shrink-0 bg-brand-500"></div>
-                        <code id="endpoint-url" class="bg-slate-900 border border-slate-800 text-brand-400 px-3 py-1 rounded text-sm font-mono truncate select-all shadow-inner flex-1 min-w-0" data-url="https://{{ .Host }}/h/{{ .Endpoint.ID }}">https://{{ .Host }}/h/{{ .Endpoint.ID }}</code>
+                        <code id="endpoint-url" class="bg-slate-900 border border-slate-800 text-brand-400 px-3 py-1 rounded text-sm font-mono truncate select-all shadow-inner flex-1 min-w-0" data-url="{{ .Scheme }}://{{ .Host }}/h/{{ .Endpoint.ID }}">{{ .Scheme }}://{{ .Host }}/h/{{ .Endpoint.ID }}</code>
                     </div>
                     <button onclick="copyEndpointUrl()" class="text-slate-500 hover:text-white transition-colors p-1.5 hover:bg-slate-800 rounded-md shrink-0">
                         <i class="fas fa-copy text-xs"></i>
@@ -49,7 +57,7 @@
                     {{ end }}
                 </div>
             </div>
-            <div class="flex items-center gap-3 whitespace-nowrap">
+            <div class="flex flex-wrap items-center gap-2 whitespace-nowrap">
                 {{ if .OtherEndpoints }}
                 <div class="relative" id="switch-container">
                     <button id="switch-btn" onclick="toggleSwitchDropdown()" class="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5">
@@ -77,6 +85,12 @@
                     Live Stream
                 </span>
                 {{ if .Endpoint }}
+                <a href="/endpoint/{{ .Endpoint.ID }}/export.json?q={{ .SearchQuery | urlquery }}" class="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-all" title="Export filtered requests as JSON">
+                    JSON
+                </a>
+                <a href="/endpoint/{{ .Endpoint.ID }}/export.csv?q={{ .SearchQuery | urlquery }}" class="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-all" title="Export filtered requests as CSV">
+                    CSV
+                </a>
                 <button onclick="openSettingsModal()" class="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-all active:scale-95 flex items-center gap-1.5">
                     <i class="fas fa-cog text-[10px]"></i>
                     Settings
@@ -588,7 +602,8 @@
             // WebSocket connection for real-time updates
             const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
             const endpointIdElement = document.getElementById("endpoint-header");
-            const endpointId = endpointIdElement ? endpointIdElement.getAttribute("data-endpoint-id") : null;
+                const endpointId = endpointIdElement ? endpointIdElement.getAttribute("data-endpoint-id") : null;
+                const searchQuery = endpointIdElement ? endpointIdElement.getAttribute("data-search-query") : "";
             console.log("WebSocket setup - endpointId:", endpointId);
             if(endpointId) {
                 const wsUrl = protocol + "//" + window.location.host + "/ws/" + endpointId;
@@ -607,6 +622,7 @@
                     console.log("WebSocket message received:", event.data);
                     var data = JSON.parse(event.data);
                     if (data.type === "new-request") {
+                        if (searchQuery) return;
                         // Create element from HTML string
                         var temp = document.createElement("div");
                         temp.innerHTML = data.payload;
@@ -722,7 +738,7 @@
     {{ if .Endpoint }}
     <!-- Settings Modal -->
     <div id="settings-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 items-center justify-center">
-        <div class="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl w-full max-w-md mx-4" onclick="event.stopPropagation()">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto custom-scrollbar" onclick="event.stopPropagation()">
             <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
                 <h3 class="text-lg font-bold text-white">Endpoint Settings</h3>
                 <button onclick="closeSettingsModal()" class="text-slate-500 hover:text-white transition-colors p-1">
@@ -736,6 +752,45 @@
                            placeholder="e.g., My Payment Webhook"
                            class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
                     <p class="text-xs text-slate-500 mt-1.5">Give your endpoint a friendly name</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-300 mb-2">Response status</label>
+                        <input type="number" name="default_status" min="200" max="599" value="{{ .Endpoint.DefaultStatus }}" required
+                               class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-300 mb-2">Delay (milliseconds)</label>
+                        <input type="number" name="response_delay_ms" min="0" max="30000" value="{{ .Endpoint.ResponseDelayMS }}" required
+                               class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-300 mb-2">Response content type</label>
+                    <input type="text" name="default_content_type" value="{{ .Endpoint.DefaultContentType }}" maxlength="200"
+                           class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-300 mb-2">Response body</label>
+                    <textarea name="default_body" rows="4" maxlength="65536"
+                              class="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-sm text-white font-mono focus:outline-none focus:border-brand-500">{{ .Endpoint.DefaultBody }}</textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-slate-300 mb-2">Forward URL (optional)</label>
+                    <input type="url" name="forward_url" value="{{ .Endpoint.ForwardURL }}" maxlength="2048" placeholder="https://api.example.com/webhooks"
+                           class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500">
+                    <p class="text-xs text-slate-500 mt-1.5">The method, headers, query, and captured body are forwarded synchronously.</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-300 mb-2">Stored request limit</label>
+                        <input type="number" name="request_limit" min="1" max="10000" value="{{ .Endpoint.RequestLimit }}" required
+                               class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-brand-500">
+                    </div>
+                    <label class="flex items-center gap-3 bg-slate-800/60 border border-slate-700 rounded-lg px-4 py-3 cursor-pointer">
+                        <input type="checkbox" name="enable_cors" {{ if .Endpoint.EnableCORS }}checked{{ end }} class="accent-brand-500">
+                        <span class="text-sm text-slate-300">Enable permissive CORS</span>
+                    </label>
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-300 mb-2">Expiration</label>
@@ -783,7 +838,7 @@
                 </div>
                 <span class="text-[10px] text-slate-500 font-mono" data-timestamp="{{ .CreatedAt.Format "2006-01-02T15:04:05Z07:00" }}">{{ .CreatedAt.Format "15:04:05" }}</span>
             </div>
-            <p class="text-xs text-slate-300 font-mono truncate">{{ .Path }}</p>
+            <p class="text-xs text-slate-300 font-mono truncate">{{ .Path }}{{ if .QueryString }}?{{ .QueryString }}{{ end }}</p>
             <p class="text-[10px] text-slate-600 font-mono truncate">{{ .RemoteAddr }}</p>
         </div>
         <button class="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-red-500 p-1"
